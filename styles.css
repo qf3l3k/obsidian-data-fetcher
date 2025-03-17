@@ -1,8 +1,102 @@
-/*
+/* Data Fetcher Plugin Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.data-fetcher-result {
+    margin: 10px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    overflow: hidden;
+}
 
-If your plugin does not need CSS, delete this file.
+.data-fetcher-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
 
-*/
+.data-fetcher-timestamp {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.data-fetcher-refresh {
+    font-size: 0.8em;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.data-fetcher-refresh:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.data-fetcher-content {
+    padding: 12px;
+    background-color: var(--background-primary);
+    overflow-x: auto;
+}
+
+.data-fetcher-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.data-fetcher-error {
+    padding: 10px;
+    color: var(--text-error);
+    background-color: var(--background-modifier-error);
+    border-radius: 5px;
+}
+
+.data-fetcher-loading {
+    padding: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Settings styles */
+.endpoint-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    background-color: var(--background-secondary);
+}
+
+.endpoint-list {
+    margin-bottom: 20px;
+}
+
+.header-row {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.header-row input {
+    flex-grow: 1;
+    margin-right: 8px;
+}
+
+.data-fetcher-delete-btn {
+    color: var(--text-error);
+}
+
+.data-fetcher-clear-cache {
+    background-color: var(--text-error) !important;
+    color: var(--text-on-accent) !important;
+}
+
+.data-fetcher-clear-cache:hover {
+    background-color: var(--text-error-hover) !important;
+}
+
+.data-fetcher-cache-info {
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
