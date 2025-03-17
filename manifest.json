@@ -6,5 +6,6 @@
   "description": "Fetch data from multiple sources (REST APIs, RPC, gRPC, GraphQL) and insert results into notes",
   "author": "qf3l3k",
   "authorUrl": "https://github.com/qf3l3k/obsidian-api-fetcher",
+  "fundingUrl": "https://buymeacoffee.com/qf3l3k",
   "isDesktopOnly": false
 }

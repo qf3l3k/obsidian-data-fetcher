@@ -1,41 +1,30 @@
-import { App } from 'obsidian';
+import { App, TFile, TFolder } from 'obsidian';
 import { QueryParams, QueryResult } from './queryEngine';
 import * as crypto from 'crypto';
 
 export class CacheManager {
     private app: App;
     private plugin: any;
-    private cache: Record<string, QueryResult> = {};
+    private cacheFolder: string = 'data-fetcher-cache'; // No leading dot
 
     constructor(app: App, plugin: any) {
         this.app = app;
         this.plugin = plugin;
-        this.loadCache();
+        this.ensureCacheFolder();
     }
 
     /**
-     * Load cache from plugin data
+     * Ensure the cache folder exists
      */
-    private async loadCache(): Promise<void> {
+    private async ensureCacheFolder(): Promise<void> {
         try {
-            const data = await this.plugin.loadData();
-            this.cache = data?.cache || {};
+            const folderExists = this.app.vault.getAbstractFileByPath(this.cacheFolder) instanceof TFolder;
+            
+            if (!folderExists) {
+                await this.app.vault.createFolder(this.cacheFolder);
+            }
         } catch (error) {
-            console.error('Failed to load cache:', error);
-            this.cache = {};
-        }
-    }
-
-    /**
-     * Save cache to plugin data
-     */
-    private async saveCache(): Promise<void> {
-        try {
-            const data = await this.plugin.loadData() || {};
-            data.cache = this.cache;
-            await this.plugin.saveData(data);
-        } catch (error) {
-            console.error('Failed to save cache:', error);
+            console.error('Failed to create cache folder:', error);
         }
     }
 
@@ -62,24 +51,28 @@ export class CacheManager {
     async getFromCache(params: QueryParams): Promise<QueryResult | null> {
         try {
             const cacheKey = this.generateCacheKey(params);
-            const cachedItem = this.cache[cacheKey];
+            const cacheFilePath = `${this.cacheFolder}/${cacheKey}.json`;
             
-            if (!cachedItem) {
+            const cacheFile = this.app.vault.getAbstractFileByPath(cacheFilePath);
+            
+            if (!(cacheFile instanceof TFile)) {
                 return null;
             }
             
+            // Read the cache file
+            const cacheContent = await this.app.vault.read(cacheFile);
+            const cacheData = JSON.parse(cacheContent);
+            
             // Check if cache is expired
             const now = Date.now();
-            const cacheAge = now - cachedItem.timestamp;
+            const cacheAge = now - cacheData.timestamp;
             const cacheDurationMs = this.plugin.settings.cacheDuration * 60 * 1000;
             
             if (cacheAge > cacheDurationMs) {
-                delete this.cache[cacheKey];
-                await this.saveCache();
                 return null; // Cache is expired
             }
             
-            return cachedItem;
+            return cacheData;
         } catch (error) {
             console.error('Error reading from cache:', error);
             return null;
@@ -91,50 +84,70 @@ export class CacheManager {
      */
     async saveToCache(params: QueryParams, result: QueryResult): Promise<void> {
         try {
+            await this.ensureCacheFolder();
             const cacheKey = this.generateCacheKey(params);
-            this.cache[cacheKey] = result;
-            await this.saveCache();
+            const cacheFilePath = `${this.cacheFolder}/${cacheKey}.json`;
+            
+            // Create or overwrite the cache file
+            await this.app.vault.adapter.write(cacheFilePath, JSON.stringify(result));
         } catch (error) {
             console.error('Error saving to cache:', error);
         }
     }
 
     /**
-     * Clear a specific cache entry
-     */
-    async clearCacheEntry(params: QueryParams): Promise<void> {
-        try {
-            const cacheKey = this.generateCacheKey(params);
-            delete this.cache[cacheKey];
-            await this.saveCache();
-        } catch (error) {
-            console.error('Error clearing cache entry:', error);
-        }
-    }
-
-    /**
-     * Clear all cache
+     * Clear all cache - simplified to just delete all files in the cache folder
      */
     async clearAllCache(): Promise<void> {
         try {
-            this.cache = {};
-            await this.saveCache();
+            const cacheFolder = this.app.vault.getAbstractFileByPath(this.cacheFolder);
+            
+            if (cacheFolder instanceof TFolder) {
+                const files = cacheFolder.children;
+                
+                // Delete all files in the cache folder
+                for (const file of files) {
+                    if (file instanceof TFile) {
+                        await this.app.vault.delete(file);
+                    }
+                }
+                
+                console.log(`Cleared ${files.length} cache files`);
+            } else {
+                // If folder doesn't exist, create it
+                await this.ensureCacheFolder();
+            }
         } catch (error) {
-            console.error('Error clearing all cache:', error);
+            console.error('Error clearing cache:', error);
         }
     }
 
     /**
-     * Get cache size information
-     * Returns the number of items and total size in bytes
+     * Get cache info - simplified to just count files in the cache folder
      */
     async getCacheInfo(): Promise<{count: number, size: number}> {
         try {
-            const count = Object.keys(this.cache).length;
-            const cacheString = JSON.stringify(this.cache);
-            const size = new TextEncoder().encode(cacheString).length;
+            const cacheFolder = this.app.vault.getAbstractFileByPath(this.cacheFolder);
             
-            return { count, size };
+            if (cacheFolder instanceof TFolder) {
+                const files = cacheFolder.children;
+                let totalSize = 0;
+                let count = 0;
+                
+                // Count all files in the cache folder
+                for (const file of files) {
+                    if (file instanceof TFile) {
+                        count++;
+                        totalSize += file.stat.size;
+                    }
+                }
+                
+                return { count, size: totalSize };
+            }
+            
+            // If folder doesn't exist, create it and return empty stats
+            await this.ensureCacheFolder();
+            return { count: 0, size: 0 };
         } catch (error) {
             console.error('Error getting cache info:', error);
             return { count: 0, size: 0 };

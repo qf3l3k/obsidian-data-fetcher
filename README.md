@@ -109,7 +109,9 @@ query: query { viewer { repositories(first: 5) { nodes { name } } } }
 
 ## Support
 
-If you encounter any issues or have feature requests, please file them on the [GitHub issues page](https://github.com/yourusername/obsidian-api-fetcher/issues).
+[!["Buy Me A Coffee"](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/qf3l3k)
+
+If you encounter any issues or have feature requests, please file them on the [GitHub issues page](https://github.com/qf3l3k/obsidian-api-fetcher/issues).
 
 ## License
 
