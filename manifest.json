@@ -1,11 +1,11 @@
 {
-  "id": "obsidian-api-fetcher",
+  "id": "data-fetcher",
   "name": "Data Fetcher",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
   "description": "Fetch data from multiple sources (REST APIs, RPC, gRPC, GraphQL) and insert results into notes",
   "author": "qf3l3k",
-  "authorUrl": "https://github.com/qf3l3k/obsidian-api-fetcher",
+  "authorUrl": "https://github.com/qf3l3k",
   "fundingUrl": "https://buymeacoffee.com/qf3l3k",
   "isDesktopOnly": false
 }
