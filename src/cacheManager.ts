@@ -124,33 +124,30 @@ export class CacheManager {
     }
 
     /**
-     * Get cache info - simplified to just count files in the cache folder
+     * Get cache info - use file system adapter to count files
      */
     async getCacheInfo(): Promise<{count: number, size: number}> {
         try {
-            const cacheFolder = this.app.vault.getAbstractFileByPath(this.cacheFolder);
+            await this.ensureCacheFolder();
+            // Read directory contents via the adapter
+            const fileNames = await this.app.vault.adapter.list(this.cacheFolder);
             
-            if (cacheFolder instanceof TFolder) {
-                const files = cacheFolder.children;
-                let totalSize = 0;
-                let count = 0;
+            let count = 0;
+            let totalSize = 0;
+            
+            // For each file in the cache folder, gather stats
+            for (const fileName of fileNames.files) {
+                const stat = await this.app.vault.adapter.stat(fileName);
                 
-                // Count all files in the cache folder
-                for (const file of files) {
-                    if (file instanceof TFile) {
-                        count++;
-                        totalSize += file.stat.size;
-                    }
+                if (stat) {
+                    count++;
+                    totalSize += stat.size;
                 }
-                
-                return { count, size: totalSize };
             }
             
-            // If folder doesn't exist, create it and return empty stats
-            await this.ensureCacheFolder();
-            return { count: 0, size: 0 };
+            return { count, size: totalSize };
         } catch (error) {
-            console.error('Error getting cache info:', error);
+            console.error("Error getting cache info:", error);
             return { count: 0, size: 0 };
         }
     }
