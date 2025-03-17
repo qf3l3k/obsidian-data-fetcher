@@ -28,8 +28,8 @@ A plugin for [Obsidian](https://obsidian.md) that allows users to fetch data fro
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/qf3l3k/obsidian-api-fetcher/releases)
-2. Extract the zip file into your Obsidian vault's `.obsidian/plugins` folder
+1. Clone the latest release from the [plugin repository page](https://github.com/qf3l3k/obsidian-api-fetcher)
+2. Copy or move cloned folder into your Obsidian vault's `.obsidian/plugins` folder
 3. Enable the plugin in Obsidian settings
 
 ## Usage
@@ -107,14 +107,28 @@ query: query { viewer { repositories(first: 5) { nodes { name } } } }
 ​```
 ```
 
+
+## TODO
+- [X] Endpoints list in Settings
+- [X] Query cache
+- [X] Pulling data from RPC
+- [X] Pulling data from API
+- [X] Pulling data from GraphQL
+- [ ] Pulling data from gRPC
+- [ ] Cache browser
+- [ ] Cache cleaner
+- [ ] ... some other not yet known features
+
+
 ## Support
 
 If you encounter any issues or have feature requests, please file them on the [GitHub issues page](https://github.com/qf3l3k/obsidian-api-fetcher/issues).
 
 
-[!["Buy Me A Coffee"](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/qf3l3k)
 
-<a href="https://www.buymeacoffee.com/qf3l3k" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style=" height: 40px !important;width: 217px !important;" ></a>
+If you like this plugin you can support it's development and ...
+
+<a href="https://www.buymeacoffee.com/qf3l3k" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style=" height: 60px !important;width: 217px !important;" ></a>
 
 
 

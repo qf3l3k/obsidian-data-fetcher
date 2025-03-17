@@ -5,7 +5,7 @@ import * as crypto from 'crypto';
 export class CacheManager {
     private app: App;
     private plugin: any;
-    private cacheFolder: string = 'data-fetcher-cache'; // No leading dot
+    private cacheFolder: string = '.data-fetcher-cache'; // No leading dot
 
     constructor(app: App, plugin: any) {
         this.app = app;
