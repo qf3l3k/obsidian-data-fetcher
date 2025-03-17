@@ -107,6 +107,19 @@ query: query { viewer { repositories(first: 5) { nodes { name } } } }
 ​```
 ```
 
+
+## TODO
+- [X] Endpoints list in Settings
+- [X] Query cache
+- [X] Pulling data from RPC
+- [X] Pulling data from API
+- [X] Pulling data from GraphQL
+- [ ] Pulling data from gRPC
+- [ ] Cache browser
+- [ ] Cache cleaner
+- [ ] ... some other not yet known features
+
+
 ## Support
 
 If you encounter any issues or have feature requests, please file them on the [GitHub issues page](https://github.com/qf3l3k/obsidian-api-fetcher/issues).
