@@ -96,29 +96,30 @@ export class CacheManager {
     }
 
     /**
-     * Clear all cache - simplified to just delete all files in the cache folder
+     * Clear all cache files using the adapter's remove method
      */
     async clearAllCache(): Promise<void> {
         try {
-            const cacheFolder = this.app.vault.getAbstractFileByPath(this.cacheFolder);
+            await this.ensureCacheFolder();
             
-            if (cacheFolder instanceof TFolder) {
-                const files = cacheFolder.children;
-                
-                // Delete all files in the cache folder
-                for (const file of files) {
-                    if (file instanceof TFile) {
-                        await this.app.vault.delete(file);
-                    }
+            // List all files in the cache folder using the adapter
+            const files = await this.app.vault.adapter.list(this.cacheFolder);
+            
+            // Remove each file from the cache folder
+            let deletedCount = 0;
+            for (const file of files.files) {
+                try {
+                    await this.app.vault.adapter.remove(file);
+                    deletedCount++;
+                } catch (err) {
+                    console.error(`Failed to delete cache file ${file}:`, err);
                 }
-                
-                console.log(`Cleared ${files.length} cache files`);
-            } else {
-                // If folder doesn't exist, create it
-                await this.ensureCacheFolder();
             }
+            
+            console.log(`Cleared ${deletedCount} cache files`);
         } catch (error) {
-            console.error('Error clearing cache:', error);
+            console.error("Error clearing cache:", error);
+            throw error; // Re-throw to be handled by the caller
         }
     }
 
