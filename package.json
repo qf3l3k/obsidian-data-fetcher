@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-api-fetcher",
-	"version": "1.0.1",
+	"version": "1.0.2",
     "description": "Fetch data from multiple sources (REST APIs, RPC, gRPC, GraphQL) and insert results into notes",
 	"main": "main.js",
 	"scripts": {

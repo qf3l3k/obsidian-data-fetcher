@@ -1,4 +1,4 @@
-# Obsidian Data Fetcher
+# Data Fetcher
 
 A plugin for [Obsidian](https://obsidian.md) that allows users to fetch data from multiple sources (REST APIs, GraphQL, gRPC, RPC) and insert the results into notes.
 
