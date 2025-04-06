@@ -20,13 +20,13 @@ export default class DataFetcherPlugin extends Plugin {
                 const cachedResult = await this.cacheManager.getFromCache(query);
                 
                 if (cachedResult) {
-                    this.renderResult(cachedResult, el, query);  // Pass the query here
+                    this.renderResult(cachedResult, el, query);
                 } else {
                     el.createEl('div', { text: 'Fetching data...', cls: 'data-fetcher-loading' });
                     const result = await executeQuery(query);
                     await this.cacheManager.saveToCache(query, result);
                     el.empty();
-                    this.renderResult(result, el, query);  // Pass the query here
+                    this.renderResult(result, el, query);
                 }
             } catch (error) {
                 el.createEl('div', { text: `Error: ${error.message}`, cls: 'data-fetcher-error' });
@@ -36,7 +36,7 @@ export default class DataFetcherPlugin extends Plugin {
 		// Add the command to manually refresh data
 		this.addCommand({
 			id: 'refresh-data-query',
-			name: 'Refresh Data Query',
+			name: 'Refresh data query', // Changed to sentence case
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				new Notice('Refreshing data queries in the current note...');
 				this.app.workspace.trigger('data-fetcher:refresh-query');
@@ -47,65 +47,65 @@ export default class DataFetcherPlugin extends Plugin {
 		this.addSettingTab(new DataFetcherSettingTab(this.app, this));
 	}
 
-    renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams) {
-        const resultContainer = container.createEl('div', { cls: 'data-fetcher-result' });
-        
-        // Create header with timestamp and refresh button
-        const header = resultContainer.createEl('div', { cls: 'data-fetcher-header' });
-        header.createEl('span', { 
-            text: `Last updated: ${new Date(result.timestamp).toLocaleString()}`, 
-            cls: 'data-fetcher-timestamp' 
-        });
-        
-        const refreshBtn = header.createEl('button', { 
-            text: 'Refresh', 
-            cls: 'data-fetcher-refresh' 
-        });
-        
-        refreshBtn.addEventListener('click', async () => {
-            try {
-                // Clear the container and show loading
-                container.empty();
-                container.createEl('div', { text: 'Refreshing data...', cls: 'data-fetcher-loading' });
-                
-                // Re-execute the query using the stored query data
-                const storedQuery = (refreshBtn as any).query;
-                if (!storedQuery) {
-                    throw new Error('Query data not found');
-                }
-                
-                const result = await executeQuery(storedQuery);
-                
-                // Update the cache
-                await this.cacheManager.saveToCache(storedQuery, result);
-                
-                // Re-render the result
-                container.empty();
-                this.renderResult(result, container, storedQuery);
-                
-                new Notice('Data refreshed successfully');
-            } catch (error) {
-                container.empty();
-                container.createEl('div', { text: `Error: ${error.message}`, cls: 'data-fetcher-error' });
-            }
-        });
-        
-        // Store the query with the button for later use
-        if (query) {
-            (refreshBtn as any).query = query;
-        }
-        
-        // Create the content container
-        const content = resultContainer.createEl('div', { cls: 'data-fetcher-content' });
-        
-        // Render the data based on type
-        if (typeof result.data === 'object') {
-            const pre = content.createEl('pre');
-            pre.createEl('code', { text: JSON.stringify(result.data, null, 2) });
-        } else {
-            content.setText(String(result.data));
-        }
-    }
+	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams) {
+	    const resultContainer = container.createEl('div', { cls: 'data-fetcher-result' });
+	    
+	    // Create header with timestamp and refresh button
+	    const header = resultContainer.createEl('div', { cls: 'data-fetcher-header' });
+	    header.createEl('span', { 
+	        text: `Last updated: ${new Date(result.timestamp).toLocaleString()}`, 
+	        cls: 'data-fetcher-timestamp' 
+	    });
+	    
+	    const refreshBtn = header.createEl('button', { 
+	        text: 'Refresh',
+	        cls: 'data-fetcher-refresh' 
+	    });
+	    
+	    refreshBtn.addEventListener('click', async () => {
+	        try {
+	            // Clear the container and show loading
+	            container.empty();
+	            container.createEl('div', { text: 'Refreshing data...', cls: 'data-fetcher-loading' });
+	            
+	            // Re-execute the query using the stored query data
+	            const storedQuery = (refreshBtn as any).query;
+	            if (!storedQuery) {
+	                throw new Error('Query data not found');
+	            }
+	            
+	            const result = await executeQuery(storedQuery);
+	            
+	            // Update the cache
+	            await this.cacheManager.saveToCache(storedQuery, result);
+	            
+	            // Re-render the result
+	            container.empty();
+	            this.renderResult(result, container, storedQuery);
+	            
+	            new Notice('Data refreshed successfully');
+	        } catch (error) {
+	            container.empty();
+	            container.createEl('div', { text: `Error: ${error.message}`, cls: 'data-fetcher-error' });
+	        }
+	    });
+	    
+	    // Store the query with the button for later use
+	    if (query) {
+	        (refreshBtn as any).query = query;
+	    }
+	    
+	    // Create the content container
+	    const content = resultContainer.createEl('div', { cls: 'data-fetcher-content' });
+	    
+	    // Render the data based on type
+	    if (typeof result.data === 'object') {
+	        const pre = content.createEl('pre');
+	        pre.createEl('code', { text: JSON.stringify(result.data, null, 2) });
+	    } else {
+	        content.setText(String(result.data));
+	    }
+	}
 
 	onunload() {
 		console.log('Unloading Data Fetcher plugin');
@@ -134,7 +134,9 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		// Cache Management section
-        containerEl.createEl('h3', {text: 'Cache Management'});
+		new Setting(containerEl)
+			.setName('Cache management')
+			.setHeading();
         
         const cacheInfoEl = containerEl.createEl('div', {
             cls: 'data-fetcher-cache-info'
@@ -145,10 +147,10 @@ class DataFetcherSettingTab extends PluginSettingTab {
         
         // Clear cache button
         new Setting(containerEl)
-            .setName('Clear Cache')
+            .setName('Clear cache')
             .setDesc('Remove all cached API responses')
             .addButton(button => button
-                .setButtonText('Clear Cache')
+                .setButtonText('Clear cache')
                 .setClass('data-fetcher-clear-cache')
                 .onClick(async () => {
                     try {
@@ -160,11 +162,9 @@ class DataFetcherSettingTab extends PluginSettingTab {
                     }
                 }));
 
-		containerEl.createEl('h3', {text: 'Data Fetcher Settings'});
-
 		// General settings
 		new Setting(containerEl)
-			.setName('Cache Duration')
+			.setName('Cache duration')
 			.setDesc('How long to cache results (in minutes)')
 			.addText(text => text
 				.setPlaceholder('60')
@@ -175,7 +175,9 @@ class DataFetcherSettingTab extends PluginSettingTab {
 				}));
 				
 		// Endpoint aliases section
-		containerEl.createEl('h3', {text: 'Endpoint Aliases'});
+		new Setting(containerEl)
+			.setName('Endpoint aliases')
+			.setHeading();
 		
 		const endpointList = containerEl.createEl('div', {cls: 'endpoint-list'});
 		
@@ -187,7 +189,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		// Add new endpoint button
 		new Setting(containerEl)
 			.addButton(button => button
-				.setButtonText('Add Endpoint')
+				.setButtonText('Add endpoint')
 				.onClick(async () => {
 					this.plugin.settings.endpoints.push({
 						alias: '',
@@ -265,7 +267,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 			.setName('Headers')
 			.setDesc('Add headers for this endpoint')
 			.addButton(button => button
-				.setButtonText('Manage Headers')
+				.setButtonText('Manage headers')
 				.onClick(() => {
 					new HeadersModal(this.app, endpoint.headers, async (headers) => {
 						this.plugin.settings.endpoints[index].headers = headers;
@@ -314,7 +316,10 @@ class HeadersModal extends Modal {
 	onOpen() {
 		const {contentEl} = this;
 		
-		contentEl.createEl('h2', {text: 'Manage Headers'});
+		// Use Setting for heading to maintain consistency
+		new Setting(contentEl)
+			.setName('Manage headers')
+			.setHeading();
 		
 		// Display existing headers
 		Object.entries(this.headers).forEach(([key, value]) => {
@@ -322,7 +327,7 @@ class HeadersModal extends Modal {
 		});
 		
 		// Add new header button
-		const addBtn = contentEl.createEl('button', {text: 'Add Header'});
+		const addBtn = contentEl.createEl('button', {text: 'Add header'});
 		addBtn.addEventListener('click', () => {
 			this.createHeaderRow(contentEl, '', '');
 		});
