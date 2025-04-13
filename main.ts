@@ -6,6 +6,8 @@ import { CacheManager } from './src/cacheManager';
 export default class DataFetcherPlugin extends Plugin {
 	settings: DataFetcherSettings;
 	cacheManager: CacheManager;
+	// Store query data associated with DOM elements
+	private queryButtonMap: WeakMap<HTMLElement, QueryParams> = new WeakMap();
 
 	async onload() {
 		console.log('Loading Data Fetcher plugin');
@@ -68,8 +70,8 @@ export default class DataFetcherPlugin extends Plugin {
 	            container.empty();
 	            container.createEl('div', { text: 'Refreshing data...', cls: 'data-fetcher-loading' });
 	            
-	            // Re-execute the query using the stored query data
-	            const storedQuery = (refreshBtn as any).query;
+	            // Get the stored query data from our WeakMap
+	            const storedQuery = this.queryButtonMap.get(refreshBtn);
 	            if (!storedQuery) {
 	                throw new Error('Query data not found');
 	            }
@@ -90,9 +92,9 @@ export default class DataFetcherPlugin extends Plugin {
 	        }
 	    });
 	    
-	    // Store the query with the button for later use
+	    // Store the query with the button using our WeakMap
 	    if (query) {
-	        (refreshBtn as any).query = query;
+	        this.queryButtonMap.set(refreshBtn, query);
 	    }
 	    
 	    // Create the content container
@@ -109,6 +111,7 @@ export default class DataFetcherPlugin extends Plugin {
 
 	onunload() {
 		console.log('Unloading Data Fetcher plugin');
+		// WeakMap will be garbage collected automatically when plugin is unloaded
 	}
 
 	async loadSettings() {
