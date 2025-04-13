@@ -59,29 +59,35 @@ export default class DataFetcherPlugin extends Plugin {
 	        cls: 'data-fetcher-timestamp' 
 	    });
 	    
-	    const refreshBtn = header.createEl('button', { 
+	    // Create action buttons container
+	    const actionButtons = header.createEl('div', { cls: 'data-fetcher-actions' });
+	    
+	    // Add copy button
+	    const copyBtn = actionButtons.createEl('button', {
+	        text: 'Copy',
+	        cls: 'data-fetcher-copy'
+	    });
+	    
+	    // Add refresh button
+	    const refreshBtn = actionButtons.createEl('button', { 
 	        text: 'Refresh',
 	        cls: 'data-fetcher-refresh' 
 	    });
 	    
 	    refreshBtn.addEventListener('click', async () => {
+	        // Existing refresh logic
 	        try {
-	            // Clear the container and show loading
 	            container.empty();
 	            container.createEl('div', { text: 'Refreshing data...', cls: 'data-fetcher-loading' });
 	            
-	            // Get the stored query data from our WeakMap
 	            const storedQuery = this.queryButtonMap.get(refreshBtn);
 	            if (!storedQuery) {
 	                throw new Error('Query data not found');
 	            }
 	            
 	            const result = await executeQuery(storedQuery);
-	            
-	            // Update the cache
 	            await this.cacheManager.saveToCache(storedQuery, result);
 	            
-	            // Re-render the result
 	            container.empty();
 	            this.renderResult(result, container, storedQuery);
 	            
@@ -100,14 +106,26 @@ export default class DataFetcherPlugin extends Plugin {
 	    // Create the content container
 	    const content = resultContainer.createEl('div', { cls: 'data-fetcher-content' });
 	    
-	    // Render the data based on type
+	    // Get the data as a string for copying
+	    let dataString: string;
+	    
 	    if (typeof result.data === 'object') {
+	        dataString = JSON.stringify(result.data, null, 2);
 	        const pre = content.createEl('pre');
-	        pre.createEl('code', { text: JSON.stringify(result.data, null, 2) });
+	        pre.createEl('code', { text: dataString });
 	    } else {
-	        content.setText(String(result.data));
+	        dataString = String(result.data);
+	        content.setText(dataString);
 	    }
+	    
+	    // Setup copy to clipboard functionality
+	    copyBtn.addEventListener('click', () => {
+	        navigator.clipboard.writeText(dataString).then(() => {
+	            new Notice('Copied to clipboard');
+	        });
+	    });
 	}
+	
 
 	onunload() {
 		console.log('Unloading Data Fetcher plugin');
