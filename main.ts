@@ -22,13 +22,13 @@ export default class DataFetcherPlugin extends Plugin {
                 const cachedResult = await this.cacheManager.getFromCache(query);
                 
                 if (cachedResult) {
-                    this.renderResult(cachedResult, el, query);
+                    this.renderResult(cachedResult, el, query, ctx);
                 } else {
                     el.createEl('div', { text: 'Fetching data...', cls: 'data-fetcher-loading' });
                     const result = await executeQuery(query);
                     await this.cacheManager.saveToCache(query, result);
                     el.empty();
-                    this.renderResult(result, el, query);
+                    this.renderResult(result, el, query, ctx);
                 }
             } catch (error) {
                 el.createEl('div', { text: `Error: ${error.message}`, cls: 'data-fetcher-error' });
@@ -49,8 +49,36 @@ export default class DataFetcherPlugin extends Plugin {
 		this.addSettingTab(new DataFetcherSettingTab(this.app, this));
 	}
 
-	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams) {
+	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams, ctx?: any) {
+	    // First clear the container
+	    container.empty();
+	    
+	    // Check if we have actual data to display
+	    if (!result || result.error) {
+	        container.createEl('div', { 
+	            text: result.error || 'No data returned from query', 
+	            cls: 'data-fetcher-error' 
+	        });
+	        console.error("Query error:", result.error);
+	        return;
+	    }
+	    
 	    const resultContainer = container.createEl('div', { cls: 'data-fetcher-result' });
+	    
+	    // Store source information from context if available
+	    if (ctx && ctx.sourcePath && ctx.getSectionInfo) {
+	        try {
+	            // Store section info for this code block in the container's dataset
+	            const sectionInfo = ctx.getSectionInfo(ctx.getSectionInfo().lineStart);
+	            if (sectionInfo) {
+	                container.dataset.sourcePath = ctx.sourcePath;
+	                container.dataset.lineStart = String(sectionInfo.lineStart);
+	                container.dataset.lineEnd = String(sectionInfo.lineEnd);
+	            }
+	        } catch (e) {
+	            console.warn("Failed to get section info:", e);
+	        }
+	    }
 	    
 	    // Create header with timestamp and refresh button
 	    const header = resultContainer.createEl('div', { cls: 'data-fetcher-header' });
@@ -66,6 +94,12 @@ export default class DataFetcherPlugin extends Plugin {
 	    const copyBtn = actionButtons.createEl('button', {
 	        text: 'Copy',
 	        cls: 'data-fetcher-copy'
+	    });
+	    
+	    // Add save to note button
+	    const saveToNoteBtn = actionButtons.createEl('button', {
+	        text: 'Save to Note',
+	        cls: 'data-fetcher-save-note'
 	    });
 	    
 	    // Add refresh button
@@ -89,7 +123,7 @@ export default class DataFetcherPlugin extends Plugin {
 	            await this.cacheManager.saveToCache(storedQuery, result);
 	            
 	            container.empty();
-	            this.renderResult(result, container, storedQuery);
+	            this.renderResult(result, container, storedQuery, ctx);
 	            
 	            new Notice('Data refreshed successfully');
 	        } catch (error) {
@@ -103,16 +137,40 @@ export default class DataFetcherPlugin extends Plugin {
 	        this.queryButtonMap.set(refreshBtn, query);
 	    }
 	    
+	    // Add event listener for save to note button with proper data
+	    saveToNoteBtn.addEventListener('click', () => {
+	        console.log("Save to Note button clicked");
+	        // Get the data as a string for saving to note
+	        let dataString: string;
+	        
+	        if (typeof result.data === 'object') {
+	            dataString = JSON.stringify(result.data, null, 2);
+	        } else {
+	            dataString = String(result.data);
+	        }
+	        
+	        // Pass the container for position info and the formatted data string
+	        this.saveResultToNote(dataString, container);
+	    });
+	    
 	    // Create the content container
 	    const content = resultContainer.createEl('div', { cls: 'data-fetcher-content' });
 	    
-	    // Get the data as a string for copying
+	    // Get the data as a string for display and copying
 	    let dataString: string;
+	    console.log("Rendering data:", result.data);
 	    
-	    if (typeof result.data === 'object') {
-	        dataString = JSON.stringify(result.data, null, 2);
-	        const pre = content.createEl('pre');
-	        pre.createEl('code', { text: dataString });
+	    if (result.data === null || result.data === undefined) {
+	        content.setText("No data returned");
+	    } else if (typeof result.data === 'object') {
+	        try {
+	            dataString = JSON.stringify(result.data, null, 2);
+	            const pre = content.createEl('pre');
+	            pre.createEl('code', { text: dataString });
+	        } catch (e) {
+	            console.error("Error stringifying data:", e);
+	            content.setText(`Error displaying data: ${e.message}`);
+	        }
 	    } else {
 	        dataString = String(result.data);
 	        content.setText(dataString);
@@ -120,12 +178,157 @@ export default class DataFetcherPlugin extends Plugin {
 	    
 	    // Setup copy to clipboard functionality
 	    copyBtn.addEventListener('click', () => {
-	        navigator.clipboard.writeText(dataString).then(() => {
+	        // Re-get the data string to ensure it's current
+	        let currentDataString: string;
+	        if (typeof result.data === 'object') {
+	            currentDataString = JSON.stringify(result.data, null, 2);
+	        } else {
+	            currentDataString = String(result.data);
+	        }
+	        
+	        navigator.clipboard.writeText(currentDataString).then(() => {
 	            new Notice('Copied to clipboard');
+	        }).catch(err => {
+	            console.error("Error copying to clipboard:", err);
+	            new Notice('Failed to copy: ' + err.message);
 	        });
 	    });
 	}
 	
+	saveResultToNote(dataString: string, container: HTMLElement): void {
+        try {
+            console.log("Save to Note clicked - attempting to save data");
+            
+            // Get the active view
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            
+            if (!activeView) {
+                console.log("No active markdown view found");
+                new Notice('No active markdown view - please open a markdown file first');
+                return;
+            }
+            
+            const editor = activeView.editor;
+            
+            // Format the data if it's not already formatted
+            let formattedData: string;
+            try {
+                // Check if the data looks like JSON
+                JSON.parse(dataString);
+                formattedData = '```json\n' + dataString + '\n```';
+            } catch (e) {
+                // If it's not valid JSON, treat as plain text
+                formattedData = dataString;
+            }
+            
+            // Add a comment with timestamp
+            const timestamp = new Date().toLocaleString();
+            const commentedData = `<!-- Data saved on ${timestamp} -->\n${formattedData}`;
+            
+            // Try to locate the code block position from container's dataset
+            if (container.dataset.sourcePath && 
+                container.dataset.lineStart && 
+                container.dataset.lineEnd) {
+                
+                console.log("Found source info in container dataset");
+                
+                // Check if the source path matches the current file
+                const currentPath = activeView.file?.path;
+                if (currentPath === container.dataset.sourcePath) {
+                    const start = { 
+                        line: parseInt(container.dataset.lineStart), 
+                        ch: 0 
+                    };
+                    const end = { 
+                        line: parseInt(container.dataset.lineEnd), 
+                        ch: editor.getLine(parseInt(container.dataset.lineEnd)).length 
+                    };
+                    
+                    console.log(`Replacing content from line ${start.line} to ${end.line}`);
+                    
+                    // Use editor transaction for safer text replacement
+                    editor.transaction({
+                        changes: [
+                            {
+                                from: start,
+                                to: end,
+                                text: commentedData
+                            }
+                        ]
+                    });
+                    
+                    new Notice('Data block replaced with static content');
+                    return;
+                } else {
+                    console.log("Source path doesn't match current file");
+                }
+            } else {
+                console.log("No source info found in container dataset");
+            }
+            
+            // Fallback: Try to use the Obsidian view to locate the code block
+            // This is a secondary approach that might work in some cases
+            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (markdownView && markdownView.getMode() === 'source') {
+                // Try to find the code block in the source by looking for data-query blocks
+                const text = editor.getValue();
+                const lines = text.split('\n');
+                
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim() === '```data-query') {
+                        // Found a start marker, now find the end
+                        let endLine = -1;
+                        for (let j = i + 1; j < lines.length; j++) {
+                            if (lines[j].trim() === '```') {
+                                endLine = j;
+                                break;
+                            }
+                        }
+                        
+                        if (endLine > i) {
+                            console.log(`Found code block from line ${i} to ${endLine}`);
+                            // Replace the entire code block
+                            const start = { line: i, ch: 0 };
+                            const end = { line: endLine, ch: lines[endLine].length };
+                            
+                            editor.transaction({
+                                changes: [
+                                    {
+                                        from: start,
+                                        to: end,
+                                        text: commentedData
+                                    }
+                                ]
+                            });
+                            
+                            new Notice('Data block replaced with static content');
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            // If all attempts to find the code block failed, insert at cursor position
+            console.log("Falling back to cursor position insertion");
+            const cursor = editor.getCursor();
+            
+            editor.transaction({
+                changes: [
+                    {
+                        from: cursor,
+                        to: cursor,
+                        text: `\n${commentedData}\n`
+                    }
+                ]
+            });
+            
+            new Notice('Data saved to note at cursor position');
+            
+        } catch (error) {
+            console.error("Error saving data to note:", error);
+            new Notice(`Error saving data: ${error.message}`);
+        }
+    }
 
 	onunload() {
 		console.log('Unloading Data Fetcher plugin');

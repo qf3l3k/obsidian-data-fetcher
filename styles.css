@@ -79,6 +79,19 @@
     background-color: var(--interactive-hover);
 }
 
+.data-fetcher-save-note {
+    font-size: 0.8em;
+    background-color: var(--interactive-success);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.data-fetcher-save-note:hover {
+    filter: brightness(1.1);
+}
 
 /* Settings styles */
 .endpoint-item {
@@ -121,4 +134,3 @@
     font-size: 0.9em;
     color: var(--text-muted);
 }
-
