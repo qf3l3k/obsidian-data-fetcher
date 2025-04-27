@@ -116,7 +116,8 @@ query: query { viewer { repositories(first: 5) { nodes { name } } } }
 - [X] Pulling data from GraphQL
 - [ ] Pulling data from gRPC
 - [ ] Cache browser
-- [ ] Cache cleaner
+- [X] Cache cleaner
+- [X] Save query results as static text
 - [ ] ... some other not yet known features
 
 
