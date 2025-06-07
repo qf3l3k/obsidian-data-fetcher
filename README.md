@@ -118,7 +118,12 @@ query: query { viewer { repositories(first: 5) { nodes { name } } } }
 - [ ] Cache browser
 - [X] Cache cleaner
 - [X] Save query results as static text
+- [ ] Pulling data from endpoints into properties
 - [ ] ... some other not yet known features
+
+## BUGS
+- [ ] Fix error reporting when data fetching failed - unreadable at the moment
+
 
 
 ## Support
