@@ -16,6 +16,7 @@ Supported endpoint types:
 - Endpoint alias configuration in plugin settings
 - Cache with configurable expiration
 - Cache browser modal (list, preview, delete individual entries)
+- Optional ribbon icon shortcut for cache browser
 - Per-block refresh button
 - Command to refresh all queries in current note
 - Copy result and Save to Note actions
@@ -180,6 +181,7 @@ Available options:
 - Per-alias headers
 - Cache clearing
 - Cache browser shortcut
+- Cache browser ribbon icon toggle
 - Cache info preview (item count/size)
 
 ## Commands

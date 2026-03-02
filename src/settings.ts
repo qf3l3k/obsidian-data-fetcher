@@ -11,9 +11,11 @@ export interface EndpointConfig {
 export interface DataFetcherSettings {
     cacheDuration: number; // in minutes
     endpoints: EndpointConfig[];
+    showCacheRibbonIcon: boolean;
 }
 
 export const DEFAULT_SETTINGS: DataFetcherSettings = {
     cacheDuration: 60,
-    endpoints: []
+    endpoints: [],
+    showCacheRibbonIcon: false
 }

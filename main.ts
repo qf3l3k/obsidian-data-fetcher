@@ -8,6 +8,7 @@ export default class DataFetcherPlugin extends Plugin {
 	cacheManager: CacheManager;
 	// Store query data associated with DOM elements
 	private queryButtonMap: WeakMap<HTMLElement, QueryParams> = new WeakMap();
+	private cacheRibbonEl: HTMLElement | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -52,6 +53,7 @@ export default class DataFetcherPlugin extends Plugin {
 				new CacheBrowserModal(this.app, this.cacheManager).open();
 			}
 		});
+		this.updateCacheRibbonIcon();
 
 		// Handle refresh events triggered by command or other plugin actions.
 		const workspaceEvents = this.app.workspace as unknown as {
@@ -63,6 +65,21 @@ export default class DataFetcherPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new DataFetcherSettingTab(this.app, this));
+	}
+
+	public updateCacheRibbonIcon(): void {
+		if (this.cacheRibbonEl) {
+			this.cacheRibbonEl.remove();
+			this.cacheRibbonEl = null;
+		}
+
+		if (!this.settings.showCacheRibbonIcon) {
+			return;
+		}
+
+		this.cacheRibbonEl = this.addRibbonIcon('database', 'Open cache browser', () => {
+			new CacheBrowserModal(this.app, this.cacheManager).open();
+		});
 	}
 
 	private extractDataQueryBlocks(markdown: string): string[] {
@@ -794,6 +811,17 @@ class DataFetcherSettingTab extends PluginSettingTab {
 					this.plugin.settings.cacheDuration = parseInt(value) || 60;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Show cache browser ribbon icon')
+			.setDesc('Add a ribbon icon for quick access to cache browser')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.showCacheRibbonIcon)
+				.onChange(async (value) => {
+					this.plugin.settings.showCacheRibbonIcon = value;
+					await this.plugin.saveSettings();
+					this.plugin.updateCacheRibbonIcon();
+				}));
 				
 		// Endpoint aliases section
 		new Setting(containerEl)
@@ -929,7 +957,9 @@ class CacheBrowserModal extends Modal {
 	private entriesContainer: HTMLElement;
 	private previewContainer: HTMLElement;
 	private summaryContainer: HTMLElement;
+	private filterInput: HTMLInputElement;
 	private selectedCacheKey: string | null = null;
+	private entries: Array<{key: string; path: string; size: number; mtime: number}> = [];
 
 	constructor(app: App, cacheManager: CacheManager) {
 		super(app);
@@ -953,23 +983,23 @@ class CacheBrowserModal extends Modal {
 		pre.createEl('code', { text });
 	}
 
-	private async refreshEntries(): Promise<void> {
-		const entries = await this.cacheManager.listCacheEntries();
-		const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
-
+	private renderEntries(): void {
+		const filter = this.filterInput?.value?.trim().toLowerCase() || '';
+		const visibleEntries = this.entries.filter(entry => entry.key.toLowerCase().includes(filter));
+		const totalSize = visibleEntries.reduce((sum, entry) => sum + entry.size, 0);
 		this.summaryContainer.empty();
-		this.summaryContainer.setText(`Entries: ${entries.length} (${this.formatBytes(totalSize)})`);
+		this.summaryContainer.setText(`Entries: ${visibleEntries.length} (${this.formatBytes(totalSize)})`);
 
 		this.entriesContainer.empty();
-		if (entries.length === 0) {
+		if (visibleEntries.length === 0) {
 			this.entriesContainer.createEl('div', {
-				text: 'No cache entries found.',
+				text: this.entries.length === 0 ? 'No cache entries found.' : 'No entries match current filter.',
 				cls: 'data-fetcher-cache-empty'
 			});
 			return;
 		}
 
-		for (const entry of entries) {
+		for (const entry of visibleEntries) {
 			const row = this.entriesContainer.createEl('div', { cls: 'data-fetcher-cache-row' });
 			const meta = row.createEl('div', { cls: 'data-fetcher-cache-row-meta' });
 			meta.createEl('div', { text: entry.key, cls: 'data-fetcher-cache-key' });
@@ -1006,10 +1036,16 @@ class CacheBrowserModal extends Modal {
 		}
 	}
 
+	private async refreshEntries(): Promise<void> {
+		this.entries = await this.cacheManager.listCacheEntries();
+		this.renderEntries();
+	}
+
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('data-fetcher-cache-browser');
+		this.modalEl.addClass('data-fetcher-cache-browser-modal');
 
 		new Setting(contentEl)
 			.setName('Cache browser')
@@ -1019,6 +1055,14 @@ class CacheBrowserModal extends Modal {
 		toolbar.createEl('button', { text: 'Refresh list' }).addEventListener('click', async () => {
 			await this.refreshEntries();
 		});
+		this.filterInput = toolbar.createEl('input', {
+			cls: 'data-fetcher-cache-filter',
+			attr: {
+				type: 'text',
+				placeholder: 'Filter by cache key...'
+			}
+		});
+		this.filterInput.addEventListener('input', () => this.renderEntries());
 		toolbar.createEl('button', { text: 'Clear all', cls: 'mod-warning' }).addEventListener('click', async () => {
 			try {
 				await this.cacheManager.clearAllCache();
@@ -1042,6 +1086,7 @@ class CacheBrowserModal extends Modal {
 	}
 
 	onClose() {
+		this.modalEl.removeClass('data-fetcher-cache-browser-modal');
 		this.contentEl.empty();
 	}
 }
