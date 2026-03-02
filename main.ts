@@ -1,4 +1,4 @@
-import { App, Editor, EventRef, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, EventRef, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { DataFetcherSettings, DEFAULT_SETTINGS } from './src/settings';
 import { parseDataQuery, executeQuery, QueryParams, QueryResult } from './src/queryEngine';
 import { CacheManager } from './src/cacheManager';
@@ -20,11 +20,13 @@ export default class DataFetcherPlugin extends Plugin {
                 const cachedResult = await this.cacheManager.getFromCache(query);
                 
                 if (cachedResult) {
+                    await this.applyOutputTargetSafely(query, cachedResult, ctx);
                     this.renderResult(cachedResult, el, query, ctx);
                 } else {
                     el.createEl('div', { text: 'Fetching data...', cls: 'data-fetcher-loading' });
                     const result = await executeQuery(query);
                     await this.cacheManager.saveToCache(query, result);
+                    await this.applyOutputTargetSafely(query, result, ctx);
                     el.empty();
                     this.renderResult(result, el, query, ctx);
                 }
@@ -103,6 +105,7 @@ export default class DataFetcherPlugin extends Plugin {
 				const query = parseDataQuery(querySource, this.settings);
 				const result = await executeQuery(query);
 				await this.cacheManager.saveToCache(query, result);
+				await this.applyOutputTargetSafely(query, result, { sourcePath: activeFile.path });
 
 				if (result.error) {
 					failedCount++;
@@ -125,37 +128,130 @@ export default class DataFetcherPlugin extends Plugin {
 		new Notice(`Refreshed ${refreshedCount}; ${failedCount} failed`);
 	}
 
+	private valuesEqual(a: any, b: any): boolean {
+		return JSON.stringify(a) === JSON.stringify(b);
+	}
+
+	private setNestedPropertyValue(target: Record<string, any>, propertyPath: string, value: any): boolean {
+		const segments = propertyPath.split('.').map(segment => segment.trim()).filter(Boolean);
+		if (segments.length === 0) {
+			throw new Error('Property path cannot be empty');
+		}
+
+		let current: Record<string, any> = target;
+		for (let i = 0; i < segments.length - 1; i++) {
+			const segment = segments[i];
+			const next = current[segment];
+			if (next === null || next === undefined) {
+				current[segment] = {};
+			} else if (typeof next !== 'object' || Array.isArray(next)) {
+				throw new Error(`Property path conflict at "${segment}"`);
+			}
+			current = current[segment] as Record<string, any>;
+		}
+
+		const finalSegment = segments[segments.length - 1];
+		if (this.valuesEqual(current[finalSegment], value)) {
+			return false;
+		}
+
+		current[finalSegment] = value;
+		return true;
+	}
+
+	private async writeToFrontmatter(sourcePath: string, propertyPath: string, value: any): Promise<boolean> {
+		const file = this.app.vault.getAbstractFileByPath(sourcePath);
+		if (!(file instanceof TFile)) {
+			throw new Error(`Source file not found: ${sourcePath}`);
+		}
+
+		let changed = false;
+		await this.app.fileManager.processFrontMatter(file, frontmatter => {
+			changed = this.setNestedPropertyValue(frontmatter, propertyPath, value);
+		});
+
+		return changed;
+	}
+
+	private async applyOutputTarget(query: QueryParams, result: QueryResult, ctx: any): Promise<void> {
+		if (query.output !== 'frontmatter') {
+			return;
+		}
+
+		if (result.error) {
+			return;
+		}
+
+		if (!query.property) {
+			throw new Error('`property` is required when `output: frontmatter` is used');
+		}
+
+		if (!ctx || !ctx.sourcePath) {
+			throw new Error('Frontmatter output requires a note source path');
+		}
+
+		const selectedData = this.selectDataByPath(result.data, query.path);
+		await this.writeToFrontmatter(ctx.sourcePath, query.property, selectedData);
+	}
+
+	private async applyOutputTargetSafely(query: QueryParams, result: QueryResult, ctx: any): Promise<void> {
+		try {
+			await this.applyOutputTarget(query, result, ctx);
+		} catch (error) {
+			console.error('Failed to apply output target:', error);
+			new Notice(`Frontmatter output failed: ${error.message}`);
+		}
+	}
+
 	private selectDataByPath(data: any, path?: string): any {
 		if (!path || path.trim() === '') {
 			return data;
 		}
 
-		const segments = path.split('.').map(segment => segment.trim()).filter(Boolean);
-		let current: any = data;
+		const resolvePath = (root: any, targetPath: string): any => {
+			const segments = targetPath.split('.').map(segment => segment.trim()).filter(Boolean);
+			let current: any = root;
 
-		for (const segment of segments) {
-			if (current === null || current === undefined) {
-				throw new Error(`Path "${path}" not found`);
-			}
-
-			if (Array.isArray(current)) {
-				const index = Number(segment);
-				if (!Number.isInteger(index) || index < 0 || index >= current.length) {
-					throw new Error(`Invalid array index "${segment}" in path "${path}"`);
+			for (const segment of segments) {
+				if (current === null || current === undefined) {
+					throw new Error(`Path "${targetPath}" not found`);
 				}
-				current = current[index];
-				continue;
+
+				if (Array.isArray(current)) {
+					const index = Number(segment);
+					if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+						throw new Error(`Invalid array index "${segment}" in path "${targetPath}"`);
+					}
+					current = current[index];
+					continue;
+				}
+
+				if (typeof current === 'object' && segment in current) {
+					current = current[segment];
+					continue;
+				}
+
+				throw new Error(`Path "${targetPath}" not found`);
 			}
 
-			if (typeof current === 'object' && segment in current) {
-				current = current[segment];
-				continue;
-			}
+			return current;
+		};
 
-			throw new Error(`Path "${path}" not found`);
+		try {
+			return resolvePath(data, path);
+		} catch (error) {
+			// Common GraphQL envelope fallback: { data: ... }
+			if (
+				data &&
+				typeof data === 'object' &&
+				'data' in data &&
+				(data as any).data &&
+				typeof (data as any).data === 'object'
+			) {
+				return resolvePath((data as any).data, path);
+			}
+			throw error;
 		}
-
-		return current;
 	}
 
 	private buildTableData(data: any): { headers: string[]; rows: Record<string, any>[] } | null {
@@ -398,6 +494,7 @@ export default class DataFetcherPlugin extends Plugin {
 	            
 	            const result = await executeQuery(storedQuery);
 	            await this.cacheManager.saveToCache(storedQuery, result);
+	            await this.applyOutputTargetSafely(storedQuery, result, ctx);
 	            
 	            container.empty();
 	            this.renderResult(result, container, storedQuery, ctx);

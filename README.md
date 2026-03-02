@@ -102,6 +102,23 @@ Notes:
 - If `format: table` is used on unsupported data, plugin falls back to JSON output.
 - Paths can include array indexes, for example `data.items.0`.
 
+### Frontmatter Output (Issue #2, in progress for v1.0.9)
+
+You can write fetched output into note properties/frontmatter:
+
+```data-query
+@bitsong
+query: query MyQuery { nftTokens { edges { node { id minter } } } }
+path: nftTokens.edges.0.node.id
+output: frontmatter
+property: external.firstTokenId
+```
+
+Notes:
+- `output: frontmatter` writes selected data to the current note frontmatter.
+- `property` is required and supports dot-path notation (for nested properties).
+- This mode updates current note metadata; it does not create new notes.
+
 ## Endpoint Type Reference
 
 ### REST
@@ -186,6 +203,7 @@ Available options:
 - `Variables must be valid JSON`: ensure valid JSON syntax (`{"x": 1}` not `{x: 1}`).
 - `Path "..." not found`: check nested field names/indexes in response data.
 - `Table format requires an array of objects`: update `path` to point at an object array, or use `format: json`.
+- `property is required when output: frontmatter is used`: add a property path.
 - No result refresh from command: ensure active pane is a markdown file.
 - Build fails on PowerShell script policy: run via `cmd /c npm run build`.
 

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-03-02
+
+### Added
+- Issue #2 (first step): support `output: frontmatter` with `property` path to store selected query results in current note metadata.
+
 ## [1.0.8] - 2026-03-02
 
 ### Added

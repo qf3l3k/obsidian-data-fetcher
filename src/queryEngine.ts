@@ -4,6 +4,8 @@ import { requestUrl, RequestUrlParam } from 'obsidian';
 export interface QueryParams {
     endpoint: string;
     type: 'rest' | 'graphql' | 'grpc' | 'rpc';
+    output?: 'render' | 'frontmatter';
+    property?: string;
     format?: 'json' | 'table';
     path?: string;
     url?: string;
@@ -26,6 +28,14 @@ function parseOutputFormat(value: string): 'json' | 'table' {
         return normalized;
     }
     throw new Error(`Unsupported format "${value}". Use "json" or "table"`);
+}
+
+function parseOutputTarget(value: string): 'render' | 'frontmatter' {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'render' || normalized === 'frontmatter') {
+        return normalized;
+    }
+    throw new Error(`Unsupported output "${value}". Use "render" or "frontmatter"`);
 }
 
 function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVariables?: Record<string, any> } {
@@ -135,6 +145,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                         queryParams.path = value;
                     } else if (key.trim() === 'format') {
                         queryParams.format = parseOutputFormat(value);
+                    } else if (key.trim() === 'output') {
+                        queryParams.output = parseOutputTarget(value);
+                    } else if (key.trim() === 'property') {
+                        queryParams.property = value;
                     }
                 }
             }
@@ -156,6 +170,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
 
                 if (queryObj.format !== undefined) {
                     queryObj.format = parseOutputFormat(String(queryObj.format));
+                }
+
+                if (queryObj.output !== undefined) {
+                    queryObj.output = parseOutputTarget(String(queryObj.output));
                 }
                 
                 return {
