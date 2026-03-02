@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Issue #5 (cache management): added Cache Browser modal with entry list, payload preview, single-entry deletion, and clear-all action.
+
 ## [1.0.9] - 2026-03-02
 
 ### Added

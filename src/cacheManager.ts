@@ -158,4 +158,86 @@ export class CacheManager {
             return { count: 0, size: 0 };
         }
     }
+
+    private extractCacheKeyFromPath(filePath: string): string | null {
+        const match = filePath.match(/([^/\\]+)\.json$/);
+        return match ? match[1] : null;
+    }
+
+    private cacheFilePathFromKey(cacheKey: string): string {
+        return `${this.cacheFolder}/${cacheKey}.json`;
+    }
+
+    async listCacheEntries(): Promise<Array<{key: string; path: string; size: number; mtime: number}>> {
+        try {
+            await this.ensureCacheFolder();
+            const listed = await this.app.vault.adapter.list(this.cacheFolder);
+            const entries: Array<{key: string; path: string; size: number; mtime: number}> = [];
+
+            for (const filePath of listed.files) {
+                if (!filePath.endsWith('.json')) {
+                    continue;
+                }
+
+                const key = this.extractCacheKeyFromPath(filePath);
+                if (!key) {
+                    continue;
+                }
+
+                const stat = await this.app.vault.adapter.stat(filePath);
+                if (!stat) {
+                    continue;
+                }
+
+                entries.push({
+                    key,
+                    path: filePath,
+                    size: stat.size,
+                    mtime: stat.mtime
+                });
+            }
+
+            entries.sort((a, b) => b.mtime - a.mtime);
+            return entries;
+        } catch (error) {
+            console.error('Error listing cache entries:', error);
+            return [];
+        }
+    }
+
+    async readCacheEntry(cacheKey: string): Promise<QueryResult | null> {
+        try {
+            await this.ensureCacheFolder();
+            const cacheFilePath = this.cacheFilePathFromKey(cacheKey);
+            const exists = await this.app.vault.adapter.exists(cacheFilePath);
+
+            if (!exists) {
+                return null;
+            }
+
+            const content = await this.app.vault.adapter.read(cacheFilePath);
+            const parsed = JSON.parse(content);
+
+            if (parsed && typeof parsed === 'object' && 'timestamp' in parsed) {
+                return parsed as QueryResult;
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`Error reading cache entry ${cacheKey}:`, error);
+            return null;
+        }
+    }
+
+    async deleteCacheEntry(cacheKey: string): Promise<void> {
+        await this.ensureCacheFolder();
+        const cacheFilePath = this.cacheFilePathFromKey(cacheKey);
+        const exists = await this.app.vault.adapter.exists(cacheFilePath);
+
+        if (!exists) {
+            return;
+        }
+
+        await this.app.vault.adapter.remove(cacheFilePath);
+    }
 }

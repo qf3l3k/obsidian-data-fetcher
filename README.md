@@ -15,6 +15,7 @@ Supported endpoint types:
 - `data-query` code block processor for live request execution
 - Endpoint alias configuration in plugin settings
 - Cache with configurable expiration
+- Cache browser modal (list, preview, delete individual entries)
 - Per-block refresh button
 - Command to refresh all queries in current note
 - Copy result and Save to Note actions
@@ -178,11 +179,13 @@ Available options:
 - Endpoint aliases
 - Per-alias headers
 - Cache clearing
+- Cache browser shortcut
 - Cache info preview (item count/size)
 
 ## Commands
 
 - `Refresh data query`: refreshes all `data-query` blocks in the active note and updates cache.
+- `Open cache browser`: opens cache browser modal for cache inspection and management.
 
 ## Actions in Rendered Block
 
@@ -196,6 +199,14 @@ Available options:
 - Keying: deterministic hash of query parameters.
 - Expiration: controlled by `Cache duration` setting.
 - Manual refresh bypasses stale content by re-executing query and writing fresh cache.
+
+### Cache Browser
+
+Use command `Open cache browser` (or settings button) to:
+- list cache entries with size/date
+- preview cached payloads
+- delete individual entries
+- clear all cache
 
 ## Troubleshooting
 

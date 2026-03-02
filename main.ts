@@ -45,6 +45,14 @@ export default class DataFetcherPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'open-cache-browser',
+			name: 'Open cache browser',
+			callback: () => {
+				new CacheBrowserModal(this.app, this.cacheManager).open();
+			}
+		});
+
 		// Handle refresh events triggered by command or other plugin actions.
 		const workspaceEvents = this.app.workspace as unknown as {
 			on(name: string, callback: (...args: unknown[]) => unknown, ctx?: unknown): EventRef;
@@ -766,6 +774,15 @@ class DataFetcherSettingTab extends PluginSettingTab {
                     }
                 }));
 
+        new Setting(containerEl)
+            .setName('Open cache browser')
+            .setDesc('Browse, preview, and delete individual cache entries')
+            .addButton(button => button
+                .setButtonText('Open browser')
+                .onClick(() => {
+                    new CacheBrowserModal(this.app, this.plugin.cacheManager).open();
+                }));
+
 		// General settings
 		new Setting(containerEl)
 			.setName('Cache duration')
@@ -905,6 +922,128 @@ class DataFetcherSettingTab extends PluginSettingTab {
             text: `Cache contains ${cacheInfo.count} items (${formatSize(cacheInfo.size)})`
         });
     }	
+}
+
+class CacheBrowserModal extends Modal {
+	private cacheManager: CacheManager;
+	private entriesContainer: HTMLElement;
+	private previewContainer: HTMLElement;
+	private summaryContainer: HTMLElement;
+	private selectedCacheKey: string | null = null;
+
+	constructor(app: App, cacheManager: CacheManager) {
+		super(app);
+		this.cacheManager = cacheManager;
+	}
+
+	private formatBytes(bytes: number): string {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+	}
+
+	private formatDate(timestamp: number): string {
+		if (!timestamp) return 'Unknown';
+		return new Date(timestamp).toLocaleString();
+	}
+
+	private setPreviewText(text: string): void {
+		this.previewContainer.empty();
+		const pre = this.previewContainer.createEl('pre', { cls: 'data-fetcher-cache-preview-pre' });
+		pre.createEl('code', { text });
+	}
+
+	private async refreshEntries(): Promise<void> {
+		const entries = await this.cacheManager.listCacheEntries();
+		const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
+
+		this.summaryContainer.empty();
+		this.summaryContainer.setText(`Entries: ${entries.length} (${this.formatBytes(totalSize)})`);
+
+		this.entriesContainer.empty();
+		if (entries.length === 0) {
+			this.entriesContainer.createEl('div', {
+				text: 'No cache entries found.',
+				cls: 'data-fetcher-cache-empty'
+			});
+			return;
+		}
+
+		for (const entry of entries) {
+			const row = this.entriesContainer.createEl('div', { cls: 'data-fetcher-cache-row' });
+			const meta = row.createEl('div', { cls: 'data-fetcher-cache-row-meta' });
+			meta.createEl('div', { text: entry.key, cls: 'data-fetcher-cache-key' });
+			meta.createEl('div', {
+				text: `${this.formatDate(entry.mtime)} | ${this.formatBytes(entry.size)}`,
+				cls: 'data-fetcher-cache-meta'
+			});
+
+			const actions = row.createEl('div', { cls: 'data-fetcher-cache-row-actions' });
+			actions.createEl('button', { text: 'Preview' }).addEventListener('click', async () => {
+				const payload = await this.cacheManager.readCacheEntry(entry.key);
+				this.selectedCacheKey = entry.key;
+
+				if (!payload) {
+					this.setPreviewText(`Entry ${entry.key} not found.`);
+					return;
+				}
+
+				this.setPreviewText(JSON.stringify(payload, null, 2));
+			});
+
+			actions.createEl('button', { text: 'Delete' }).addEventListener('click', async () => {
+				try {
+					await this.cacheManager.deleteCacheEntry(entry.key);
+					if (this.selectedCacheKey === entry.key) {
+						this.selectedCacheKey = null;
+						this.setPreviewText('Select an entry to preview');
+					}
+					await this.refreshEntries();
+				} catch (error) {
+					new Notice(`Failed to delete entry: ${error.message}`);
+				}
+			});
+		}
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('data-fetcher-cache-browser');
+
+		new Setting(contentEl)
+			.setName('Cache browser')
+			.setHeading();
+
+		const toolbar = contentEl.createEl('div', { cls: 'data-fetcher-cache-toolbar' });
+		toolbar.createEl('button', { text: 'Refresh list' }).addEventListener('click', async () => {
+			await this.refreshEntries();
+		});
+		toolbar.createEl('button', { text: 'Clear all', cls: 'mod-warning' }).addEventListener('click', async () => {
+			try {
+				await this.cacheManager.clearAllCache();
+				this.selectedCacheKey = null;
+				this.setPreviewText('Select an entry to preview');
+				await this.refreshEntries();
+				new Notice('Cache cleared successfully');
+			} catch (error) {
+				new Notice(`Failed to clear cache: ${error.message}`);
+			}
+		});
+
+		this.summaryContainer = contentEl.createEl('div', { cls: 'data-fetcher-cache-summary' });
+
+		const split = contentEl.createEl('div', { cls: 'data-fetcher-cache-split' });
+		this.entriesContainer = split.createEl('div', { cls: 'data-fetcher-cache-list' });
+		this.previewContainer = split.createEl('div', { cls: 'data-fetcher-cache-preview' });
+		this.setPreviewText('Select an entry to preview');
+
+		void this.refreshEntries();
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
 }
 
 class HeadersModal extends Modal {
