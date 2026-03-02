@@ -47,6 +47,30 @@
     white-space: pre-wrap;
 }
 
+.data-fetcher-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.data-fetcher-table th,
+.data-fetcher-table td {
+    border: 1px solid var(--background-modifier-border);
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.data-fetcher-table th {
+    background-color: var(--background-secondary);
+}
+
+.data-fetcher-format-note {
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
 .data-fetcher-error {
     padding: 10px;
     color: var(--text-normal);

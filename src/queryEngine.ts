@@ -4,6 +4,8 @@ import { requestUrl, RequestUrlParam } from 'obsidian';
 export interface QueryParams {
     endpoint: string;
     type: 'rest' | 'graphql' | 'grpc' | 'rpc';
+    format?: 'json' | 'table';
+    path?: string;
     url?: string;
     method?: string;
     headers?: Record<string, string>;
@@ -16,6 +18,14 @@ export interface QueryResult {
     data: any;
     timestamp: number;
     error?: string;
+}
+
+function parseOutputFormat(value: string): 'json' | 'table' {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'json' || normalized === 'table') {
+        return normalized;
+    }
+    throw new Error(`Unsupported format "${value}". Use "json" or "table"`);
 }
 
 function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVariables?: Record<string, any> } {
@@ -121,6 +131,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                         } catch {
                             throw new Error('Variables must be valid JSON');
                         }
+                    } else if (key.trim() === 'path') {
+                        queryParams.path = value;
+                    } else if (key.trim() === 'format') {
+                        queryParams.format = parseOutputFormat(value);
                     }
                 }
             }
@@ -138,6 +152,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                 
                 if (!queryObj.url) {
                     throw new Error('URL is required');
+                }
+
+                if (queryObj.format !== undefined) {
+                    queryObj.format = parseOutputFormat(String(queryObj.format));
                 }
                 
                 return {

@@ -125,6 +125,86 @@ export default class DataFetcherPlugin extends Plugin {
 		new Notice(`Refreshed ${refreshedCount}; ${failedCount} failed`);
 	}
 
+	private selectDataByPath(data: any, path?: string): any {
+		if (!path || path.trim() === '') {
+			return data;
+		}
+
+		const segments = path.split('.').map(segment => segment.trim()).filter(Boolean);
+		let current: any = data;
+
+		for (const segment of segments) {
+			if (current === null || current === undefined) {
+				throw new Error(`Path "${path}" not found`);
+			}
+
+			if (Array.isArray(current)) {
+				const index = Number(segment);
+				if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+					throw new Error(`Invalid array index "${segment}" in path "${path}"`);
+				}
+				current = current[index];
+				continue;
+			}
+
+			if (typeof current === 'object' && segment in current) {
+				current = current[segment];
+				continue;
+			}
+
+			throw new Error(`Path "${path}" not found`);
+		}
+
+		return current;
+	}
+
+	private buildTableData(data: any): { headers: string[]; rows: Record<string, any>[] } | null {
+		if (!Array.isArray(data) || data.length === 0) {
+			return null;
+		}
+
+		const rows: Record<string, any>[] = [];
+		const headers: string[] = [];
+		const seenHeaders = new Set<string>();
+
+		for (const item of data) {
+			if (!item || typeof item !== 'object' || Array.isArray(item)) {
+				return null;
+			}
+			rows.push(item as Record<string, any>);
+
+			for (const key of Object.keys(item)) {
+				if (!seenHeaders.has(key)) {
+					seenHeaders.add(key);
+					headers.push(key);
+				}
+			}
+		}
+
+		return { headers, rows };
+	}
+
+	private tableCellValue(value: any): string {
+		if (value === null || value === undefined) {
+			return '';
+		}
+		if (typeof value === 'object') {
+			return JSON.stringify(value);
+		}
+		return String(value);
+	}
+
+	private toMarkdownTable(headers: string[], rows: Record<string, any>[]): string {
+		const headerLine = `| ${headers.join(' | ')} |`;
+		const dividerLine = `| ${headers.map(() => '---').join(' | ')} |`;
+		const rowLines = rows.map(row => {
+			const cells = headers.map(header => this.tableCellValue(row[header]).replace(/\|/g, '\\|'));
+			return `| ${cells.join(' | ')} |`;
+		});
+
+		return [headerLine, dividerLine, ...rowLines].join('\n');
+	}
+
 	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams, ctx?: any) {
 	    // First clear the container
 	    container.empty();
@@ -155,6 +235,8 @@ export default class DataFetcherPlugin extends Plugin {
 	            console.warn("Failed to get section info:", e);
 	        }
 	    }
+	    
+	    let outputText = '';
 	    
 	    // Create header with timestamp and refresh button
 	    const header = resultContainer.createEl('div', { cls: 'data-fetcher-header' });
@@ -215,52 +297,62 @@ export default class DataFetcherPlugin extends Plugin {
 	    
 	    // Add event listener for save to note button with proper data
 	    saveToNoteBtn.addEventListener('click', () => {
-	        // Get the data as a string for saving to note
-	        let dataString: string;
-	        
-	        if (typeof result.data === 'object') {
-	            dataString = JSON.stringify(result.data, null, 2);
-	        } else {
-	            dataString = String(result.data);
-	        }
-	        
-	        // Pass the container for position info and the formatted data string
-	        this.saveResultToNote(dataString, container);
+	        this.saveResultToNote(outputText, container);
 	    });
 	    
 	    // Create the content container
 	    const content = resultContainer.createEl('div', { cls: 'data-fetcher-content' });
 	    
-	    // Get the data as a string for display and copying
-	    let dataString: string;
-	    
-	    if (result.data === null || result.data === undefined) {
-	        content.setText("No data returned");
-	    } else if (typeof result.data === 'object') {
-	        try {
-	            dataString = JSON.stringify(result.data, null, 2);
+	    try {
+	        const selectedData = this.selectDataByPath(result.data, query?.path);
+	        const format = query?.format || 'json';
+	        
+	        if (selectedData === null || selectedData === undefined) {
+	            outputText = 'No data returned';
+	            content.setText(outputText);
+	        } else if (format === 'table') {
+	            const tableData = this.buildTableData(selectedData);
+	            if (tableData) {
+	                const tableEl = content.createEl('table', { cls: 'data-fetcher-table' });
+	                const thead = tableEl.createEl('thead');
+	                const headerRow = thead.createEl('tr');
+	                for (const headerName of tableData.headers) {
+	                    headerRow.createEl('th', { text: headerName });
+	                }
+	                const tbody = tableEl.createEl('tbody');
+	                for (const row of tableData.rows) {
+	                    const tr = tbody.createEl('tr');
+	                    for (const headerName of tableData.headers) {
+	                        tr.createEl('td', { text: this.tableCellValue(row[headerName]) });
+	                    }
+	                }
+	                outputText = this.toMarkdownTable(tableData.headers, tableData.rows);
+	            } else {
+	                outputText = JSON.stringify(selectedData, null, 2);
+	                content.createEl('div', {
+	                    text: 'Table format requires an array of objects. Showing JSON output instead.',
+	                    cls: 'data-fetcher-format-note'
+	                });
+	                const pre = content.createEl('pre');
+	                pre.createEl('code', { text: outputText });
+	            }
+	        } else if (typeof selectedData === 'object') {
+	            outputText = JSON.stringify(selectedData, null, 2);
 	            const pre = content.createEl('pre');
-	            pre.createEl('code', { text: dataString });
-	        } catch (e) {
-	            console.error("Error stringifying data:", e);
-	            content.setText(`Error displaying data: ${e.message}`);
+	            pre.createEl('code', { text: outputText });
+	        } else {
+	            outputText = String(selectedData);
+	            content.setText(outputText);
 	        }
-	    } else {
-	        dataString = String(result.data);
-	        content.setText(dataString);
+	    } catch (e) {
+	        const errorMessage = `Error displaying data: ${e.message}`;
+	        outputText = errorMessage;
+	        content.createEl('div', { text: errorMessage, cls: 'data-fetcher-error' });
 	    }
 	    
 	    // Setup copy to clipboard functionality
 	    copyBtn.addEventListener('click', () => {
-	        // Re-get the data string to ensure it's current
-	        let currentDataString: string;
-	        if (typeof result.data === 'object') {
-	            currentDataString = JSON.stringify(result.data, null, 2);
-	        } else {
-	            currentDataString = String(result.data);
-	        }
-	        
-	        navigator.clipboard.writeText(currentDataString).then(() => {
+	        navigator.clipboard.writeText(outputText).then(() => {
 	            new Notice('Copied to clipboard');
 	        }).catch(err => {
 	            console.error("Error copying to clipboard:", err);

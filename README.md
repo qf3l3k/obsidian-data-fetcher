@@ -82,6 +82,26 @@ Notes:
 - Inline variables must be a valid JSON object.
 - Explicit `variables:` entry later in the block overrides inline variables.
 
+### Output Shaping (Issue #6, v1.0.8)
+
+You can control rendered output with:
+- `path`: selects nested data using dot notation
+- `format`: `json` (default) or `table`
+
+Example:
+
+```data-query
+@bitsong
+query: query MyQuery { nftTokens { edges { node { id minter } } } }
+path: nftTokens.edges
+format: table
+```
+
+Notes:
+- `table` works on arrays of objects.
+- If `format: table` is used on unsupported data, plugin falls back to JSON output.
+- Paths can include array indexes, for example `data.items.0`.
+
 ## Endpoint Type Reference
 
 ### REST
@@ -100,6 +120,8 @@ Common fields:
 - `url`: GraphQL endpoint URL
 - `query`: GraphQL query string
 - `variables`: JSON object
+- `path`: optional dot-path selector for rendered data
+- `format`: `json` | `table` for rendered output
 - `headers`: object
 
 Example:
@@ -162,6 +184,8 @@ Available options:
 
 - `Endpoint alias "..." not found`: add or fix alias in settings.
 - `Variables must be valid JSON`: ensure valid JSON syntax (`{"x": 1}` not `{x: 1}`).
+- `Path "..." not found`: check nested field names/indexes in response data.
+- `Table format requires an array of objects`: update `path` to point at an object array, or use `format: json`.
 - No result refresh from command: ensure active pane is a markdown file.
 - Build fails on PowerShell script policy: run via `cmd /c npm run build`.
 
