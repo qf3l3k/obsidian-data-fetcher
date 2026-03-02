@@ -1,6 +1,5 @@
 import { App, TFile, TFolder } from 'obsidian';
 import { QueryParams, QueryResult } from './queryEngine';
-import * as crypto from 'crypto';
 
 export class CacheManager {
     private app: App;
@@ -42,7 +41,19 @@ export class CacheManager {
             variables: params.variables
         });
         
-        return crypto.createHash('md5').update(stringToHash).digest('hex');
+        return this.hashString(stringToHash);
+    }
+
+    /**
+     * Lightweight deterministic hash to keep cache keys stable across platforms.
+     */
+    private hashString(input: string): string {
+        let hash = 2166136261;
+        for (let i = 0; i < input.length; i++) {
+            hash ^= input.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return (hash >>> 0).toString(16).padStart(8, '0');
     }
 
     /**
@@ -106,17 +117,13 @@ export class CacheManager {
             const files = await this.app.vault.adapter.list(this.cacheFolder);
             
             // Remove each file from the cache folder
-            let deletedCount = 0;
             for (const file of files.files) {
                 try {
                     await this.app.vault.adapter.remove(file);
-                    deletedCount++;
                 } catch (err) {
                     console.error(`Failed to delete cache file ${file}:`, err);
                 }
             }
-            
-            console.log(`Cleared ${deletedCount} cache files`);
         } catch (error) {
             console.error("Error clearing cache:", error);
             throw error; // Re-throw to be handled by the caller

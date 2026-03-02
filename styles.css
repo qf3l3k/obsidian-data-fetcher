@@ -49,8 +49,10 @@
 
 .data-fetcher-error {
     padding: 10px;
-    color: var(--text-error);
-    background-color: var(--background-modifier-error);
+    color: var(--text-normal);
+    background-color: var(--background-secondary);
+    border: 1px solid var(--text-error);
+    border-left: 4px solid var(--text-error);
     border-radius: 5px;
 }
 
