@@ -4,11 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-03-02
+
 ### Added
 - Issue #6: added optional `path` selector and `format: table` rendering for array-of-object JSON responses.
 
 ### Changed
 - Copy and Save actions now use transformed output (selected path / table view).
+- Improved table readability by truncating long cell content in UI with full value on hover.
 
 ## [1.0.7] - 2026-03-02
 

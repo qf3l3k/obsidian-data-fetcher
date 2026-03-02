@@ -65,6 +65,15 @@
     background-color: var(--background-secondary);
 }
 
+.data-fetcher-table-cell {
+    display: inline-block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
 .data-fetcher-format-note {
     margin-bottom: 8px;
     color: var(--text-muted);

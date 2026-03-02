@@ -184,6 +184,116 @@ export default class DataFetcherPlugin extends Plugin {
 		return { headers, rows };
 	}
 
+	private tryResolveTableInput(data: any): any {
+		if (Array.isArray(data)) {
+			return data;
+		}
+
+		if (!data || typeof data !== 'object') {
+			return data;
+		}
+
+		// Common GraphQL envelope: { data: ... }
+		if ('data' in data && data.data && typeof data.data === 'object') {
+			const unwrapped = this.tryResolveTableInput(data.data);
+			if (Array.isArray(unwrapped)) {
+				return unwrapped;
+			}
+		}
+
+		// If object has exactly one property, keep drilling into it.
+		const keys = Object.keys(data);
+		if (keys.length === 1) {
+			const singleValue = data[keys[0]];
+			const drilled = this.tryResolveTableInput(singleValue);
+			if (Array.isArray(drilled)) {
+				return drilled;
+			}
+		}
+
+		// GraphQL connections: { edges: [...] }
+		if (Array.isArray((data as any).edges)) {
+			return (data as any).edges;
+		}
+
+		// Generic object containing any array field.
+		for (const key of keys) {
+			if (Array.isArray((data as any)[key])) {
+				return (data as any)[key];
+			}
+		}
+
+		return data;
+	}
+
+	private findFirstArrayOfObjects(data: any, depth: number = 0): Record<string, any>[] | null {
+		if (depth > 8 || data === null || data === undefined) {
+			return null;
+		}
+
+		if (Array.isArray(data)) {
+			if (data.length > 0 && data.every(item =>
+				item &&
+				typeof item === 'object' &&
+				!Array.isArray(item)
+			)) {
+				return data as Record<string, any>[];
+			}
+
+			for (const item of data) {
+				const nested = this.findFirstArrayOfObjects(item, depth + 1);
+				if (nested) {
+					return nested;
+				}
+			}
+			return null;
+		}
+
+		if (typeof data !== 'object') {
+			return null;
+		}
+
+		const objectData = data as Record<string, any>;
+		const priorityKeys = ['edges', 'nodes', 'items', 'results', 'data'];
+
+		for (const key of priorityKeys) {
+			if (key in objectData) {
+				const nested = this.findFirstArrayOfObjects(objectData[key], depth + 1);
+				if (nested) {
+					return nested;
+				}
+			}
+		}
+
+		for (const value of Object.values(objectData)) {
+			const nested = this.findFirstArrayOfObjects(value, depth + 1);
+			if (nested) {
+				return nested;
+			}
+		}
+
+		return null;
+	}
+
+	private normalizeTableRows(rows: Record<string, any>[]): Record<string, any>[] {
+		// Common GraphQL edge shape: [{ node: {...} }]
+		const canUnwrapNode = rows.length > 0 && rows.every(row =>
+			row &&
+			typeof row === 'object' &&
+			!Array.isArray(row) &&
+			Object.keys(row).length === 1 &&
+			row.node &&
+			typeof row.node === 'object' &&
+			!Array.isArray(row.node)
+		);
+
+		if (canUnwrapNode) {
+			return rows.map(row => row.node as Record<string, any>);
+		}
+
+		return rows;
+	}
+
 	private tableCellValue(value: any): string {
 		if (value === null || value === undefined) {
 			return '';
@@ -192,6 +302,15 @@ export default class DataFetcherPlugin extends Plugin {
 			return JSON.stringify(value);
 		}
 		return String(value);
+	}
+
+	private tableCellDisplayValue(value: any): string {
+		const raw = this.tableCellValue(value).replace(/\s+/g, ' ').trim();
+		const maxLength = 120;
+		if (raw.length <= maxLength) {
+			return raw;
+		}
+		return `${raw.substring(0, maxLength - 3)}...`;
 	}
 
 	private toMarkdownTable(headers: string[], rows: Record<string, any>[]): string {
@@ -311,7 +430,14 @@ export default class DataFetcherPlugin extends Plugin {
 	            outputText = 'No data returned';
 	            content.setText(outputText);
 	        } else if (format === 'table') {
-	            const tableData = this.buildTableData(selectedData);
+	            const tableInput = this.tryResolveTableInput(selectedData);
+	            const resolvedTableInput = this.buildTableData(tableInput)
+	                ? tableInput
+	                : (this.findFirstArrayOfObjects(tableInput) || tableInput);
+	            const initialTable = this.buildTableData(resolvedTableInput);
+	            const tableData = initialTable
+	                ? this.buildTableData(this.normalizeTableRows(initialTable.rows))
+	                : null;
 	            if (tableData) {
 	                const tableEl = content.createEl('table', { cls: 'data-fetcher-table' });
 	                const thead = tableEl.createEl('thead');
@@ -323,7 +449,13 @@ export default class DataFetcherPlugin extends Plugin {
 	                for (const row of tableData.rows) {
 	                    const tr = tbody.createEl('tr');
 	                    for (const headerName of tableData.headers) {
-	                        tr.createEl('td', { text: this.tableCellValue(row[headerName]) });
+	                        const fullValue = this.tableCellValue(row[headerName]);
+	                        const cell = tr.createEl('td');
+	                        cell.createEl('span', {
+	                            text: this.tableCellDisplayValue(row[headerName]),
+	                            cls: 'data-fetcher-table-cell',
+	                            attr: { title: fullValue }
+	                        });
 	                    }
 	                }
 	                outputText = this.toMarkdownTable(tableData.headers, tableData.rows);
