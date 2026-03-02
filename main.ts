@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, EventRef, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { DataFetcherSettings, DEFAULT_SETTINGS } from './src/settings';
 import { parseDataQuery, executeQuery, QueryParams, QueryResult } from './src/queryEngine';
 import { CacheManager } from './src/cacheManager';
@@ -10,8 +10,6 @@ export default class DataFetcherPlugin extends Plugin {
 	private queryButtonMap: WeakMap<HTMLElement, QueryParams> = new WeakMap();
 
 	async onload() {
-		console.log('Loading Data Fetcher plugin');
-		
 		await this.loadSettings();
 		this.cacheManager = new CacheManager(this.app, this);
 
@@ -45,8 +43,86 @@ export default class DataFetcherPlugin extends Plugin {
 			}
 		});
 
+		// Handle refresh events triggered by command or other plugin actions.
+		const workspaceEvents = this.app.workspace as unknown as {
+			on(name: string, callback: (...args: unknown[]) => unknown, ctx?: unknown): EventRef;
+		};
+		this.registerEvent(workspaceEvents.on('data-fetcher:refresh-query', async () => {
+			await this.refreshQueriesInActiveNote();
+		}));
+
 		// Add settings tab
 		this.addSettingTab(new DataFetcherSettingTab(this.app, this));
+	}
+
+	private extractDataQueryBlocks(markdown: string): string[] {
+		const queryBlocks: string[] = [];
+		const dataQueryRegex = /```data-query[^\n]*\n([\s\S]*?)```/g;
+		let match: RegExpExecArray | null;
+
+		while ((match = dataQueryRegex.exec(markdown)) !== null) {
+			queryBlocks.push(match[1].trim());
+		}
+
+		return queryBlocks;
+	}
+
+	private rerenderActiveView(view: MarkdownView): void {
+		const previewMode = (view as any).previewMode;
+		if (previewMode && typeof previewMode.rerender === 'function') {
+			previewMode.rerender(true);
+			return;
+		}
+
+		// Fallback that still refreshes markdown render output.
+		this.app.workspace.trigger('layout-change');
+	}
+
+	private async refreshQueriesInActiveNote(): Promise<void> {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const activeFile = activeView?.file;
+
+		if (!activeView || !activeFile) {
+			new Notice('No active markdown file to refresh');
+			return;
+		}
+
+		const content = await this.app.vault.cachedRead(activeFile);
+		const queryBlocks = this.extractDataQueryBlocks(content);
+
+		if (queryBlocks.length === 0) {
+			new Notice('No data-query blocks found in the current note');
+			return;
+		}
+
+		let refreshedCount = 0;
+		let failedCount = 0;
+
+		for (const querySource of queryBlocks) {
+			try {
+				const query = parseDataQuery(querySource, this.settings);
+				const result = await executeQuery(query);
+				await this.cacheManager.saveToCache(query, result);
+
+				if (result.error) {
+					failedCount++;
+				} else {
+					refreshedCount++;
+				}
+			} catch (error) {
+				failedCount++;
+				console.error('Failed to refresh query block:', error);
+			}
+		}
+
+		this.rerenderActiveView(activeView);
+
+		if (failedCount === 0) {
+			new Notice(`Refreshed ${refreshedCount} data quer${refreshedCount === 1 ? 'y' : 'ies'}`);
+			return;
+		}
+
+		new Notice(`Refreshed ${refreshedCount}; ${failedCount} failed`);
 	}
 
 	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams, ctx?: any) {
@@ -69,7 +145,7 @@ export default class DataFetcherPlugin extends Plugin {
 	    if (ctx && ctx.sourcePath && ctx.getSectionInfo) {
 	        try {
 	            // Store section info for this code block in the container's dataset
-	            const sectionInfo = ctx.getSectionInfo(ctx.getSectionInfo().lineStart);
+	            const sectionInfo = ctx.getSectionInfo(container);
 	            if (sectionInfo) {
 	                container.dataset.sourcePath = ctx.sourcePath;
 	                container.dataset.lineStart = String(sectionInfo.lineStart);
@@ -139,7 +215,6 @@ export default class DataFetcherPlugin extends Plugin {
 	    
 	    // Add event listener for save to note button with proper data
 	    saveToNoteBtn.addEventListener('click', () => {
-	        console.log("Save to Note button clicked");
 	        // Get the data as a string for saving to note
 	        let dataString: string;
 	        
@@ -158,7 +233,6 @@ export default class DataFetcherPlugin extends Plugin {
 	    
 	    // Get the data as a string for display and copying
 	    let dataString: string;
-	    console.log("Rendering data:", result.data);
 	    
 	    if (result.data === null || result.data === undefined) {
 	        content.setText("No data returned");
@@ -197,13 +271,10 @@ export default class DataFetcherPlugin extends Plugin {
 	
 	saveResultToNote(dataString: string, container: HTMLElement): void {
         try {
-            console.log("Save to Note clicked - attempting to save data");
-            
             // Get the active view
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
             
             if (!activeView) {
-                console.log("No active markdown view found");
                 new Notice('No active markdown view - please open a markdown file first');
                 return;
             }
@@ -229,9 +300,6 @@ export default class DataFetcherPlugin extends Plugin {
             if (container.dataset.sourcePath && 
                 container.dataset.lineStart && 
                 container.dataset.lineEnd) {
-                
-                console.log("Found source info in container dataset");
-                
                 // Check if the source path matches the current file
                 const currentPath = activeView.file?.path;
                 if (currentPath === container.dataset.sourcePath) {
@@ -243,8 +311,6 @@ export default class DataFetcherPlugin extends Plugin {
                         line: parseInt(container.dataset.lineEnd), 
                         ch: editor.getLine(parseInt(container.dataset.lineEnd)).length 
                     };
-                    
-                    console.log(`Replacing content from line ${start.line} to ${end.line}`);
                     
                     // Use editor transaction for safer text replacement
                     editor.transaction({
@@ -259,11 +325,7 @@ export default class DataFetcherPlugin extends Plugin {
                     
                     new Notice('Data block replaced with static content');
                     return;
-                } else {
-                    console.log("Source path doesn't match current file");
                 }
-            } else {
-                console.log("No source info found in container dataset");
             }
             
             // Fallback: Try to use the Obsidian view to locate the code block
@@ -286,7 +348,6 @@ export default class DataFetcherPlugin extends Plugin {
                         }
                         
                         if (endLine > i) {
-                            console.log(`Found code block from line ${i} to ${endLine}`);
                             // Replace the entire code block
                             const start = { line: i, ch: 0 };
                             const end = { line: endLine, ch: lines[endLine].length };
@@ -309,7 +370,6 @@ export default class DataFetcherPlugin extends Plugin {
             }
             
             // If all attempts to find the code block failed, insert at cursor position
-            console.log("Falling back to cursor position insertion");
             const cursor = editor.getCursor();
             
             editor.transaction({
@@ -331,7 +391,6 @@ export default class DataFetcherPlugin extends Plugin {
     }
 
 	onunload() {
-		console.log('Unloading Data Fetcher plugin');
 		// WeakMap will be garbage collected automatically when plugin is unloaded
 	}
 

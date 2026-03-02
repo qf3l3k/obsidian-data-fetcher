@@ -1,45 +1,41 @@
 # Data Fetcher
 
-A plugin for [Obsidian](https://obsidian.md) that allows users to fetch data from multiple sources (REST APIs, GraphQL, gRPC, RPC) and insert the results into notes.
+A plugin for [Obsidian](https://obsidian.md) that fetches data from external endpoints (REST, GraphQL, RPC, gRPC via proxy) and renders the results in notes.
 
 ## Features
 
-- Support for multiple data sources:
+- Fetch from:
   - REST APIs
   - GraphQL endpoints
-  - gRPC services (via REST proxies)
-  - RPC services
-- Two modes of operation:
-  - Directly define queries within notes
-  - Predefine endpoints in settings and reference them in notes
-- Automatic caching of query results to reduce redundant requests
-- Cache expiration settings
-- Manual refresh capabilities
-- Customizable headers for authentication
+  - RPC endpoints
+  - gRPC services via REST proxy
+- Two query modes:
+  - Inline query definition in a `data-query` code block
+  - Endpoint aliases configured in plugin settings
+- Query result caching with configurable expiration
+- Manual refresh, copy, and save-to-note actions
+- Per-endpoint request headers for authentication and API keys
 
 ## Installation
 
-### From Obsidian Community Plugins
+### Community Plugins
 
-1. Open Obsidian Settings
-2. Go to Community Plugins
-3. Search for "Data Fetcher"
-4. Click Install, then Enable
+1. Open Obsidian Settings.
+2. Go to Community Plugins.
+3. Search for `Data Fetcher`.
+4. Install and enable.
 
-### Manual Installation
+### Manual
 
-1. Clone the latest release from the [plugin repository page](https://github.com/qf3l3k/obsidian-api-fetcher)
-2. Copy or move cloned folder into your Obsidian vault's `.obsidian/plugins` folder
-3. Enable the plugin in Obsidian settings
+1. Download the latest release from the [repository](https://github.com/qf3l3k/obsidian-api-fetcher).
+2. Place the release files in your vault at `.obsidian/plugins/data-fetcher`.
+3. Enable the plugin in Obsidian settings.
 
 ## Usage
 
-### Method 1: Direct Query Definition
+### 1. Inline Query
 
-Create a code block with the language set to `data-query` and define your query in JSON format:
-
-```
-​```data-query
+```data-query
 {
   "type": "rest",
   "url": "https://api.example.com/data",
@@ -48,90 +44,51 @@ Create a code block with the language set to `data-query` and define your query 
     "Authorization": "Bearer your-token"
   }
 }
-​```
 ```
 
-### Method 2: Using Aliases
+### 2. Endpoint Alias
 
-1. First, define an endpoint alias in the plugin settings
-2. Then reference it in your notes:
+1. Configure an endpoint alias in plugin settings.
+2. Reference it in a note:
 
-```
-​```data-query
+```data-query
 @my-api-alias
-body: {"id": 123}
-​```
-```
-
-## Configuration
-
-Go to Settings > Data Fetcher to configure:
-
-- Cache duration
-- Pre-defined endpoint aliases
-- Default headers
-
-## Examples
-
-### REST API Example
-
-```
-​```data-query
-{
-  "type": "rest",
-  "url": "https://jsonplaceholder.typicode.com/posts/1",
-  "method": "GET"
-}
-​```
+body: {"id":123}
 ```
 
 ### GraphQL Example
 
-```
-​```data-query
+```data-query
 {
   "type": "graphql",
   "url": "https://api.spacex.land/graphql",
   "query": "{ launchesPast(limit: 5) { mission_name launch_date_local } }",
   "variables": {}
 }
-​```
 ```
 
-### Using Aliases
+## Configuration
 
-```
-​```data-query
-@github-api
-query: query { viewer { repositories(first: 5) { nodes { name } } } }
-​```
-```
+Open `Settings -> Data Fetcher` to manage:
 
+- Cache duration
+- Endpoint aliases
+- Endpoint headers
+- Cache cleanup
 
-## TODO
-- [X] Endpoints list in Settings
-- [X] Query cache
-- [X] Pulling data from RPC
-- [X] Pulling data from API
-- [X] Pulling data from GraphQL
-- [ ] Pulling data from gRPC
-- [ ] Cache browser
-- [X] Cache cleaner
-- [X] Save query results as static text
-- [ ] ... some other not yet known features
+## Data Disclosure
 
+This plugin communicates with external services and stores response data:
+
+- Network usage: Sends HTTP(S) requests to endpoint URLs defined in notes or settings.
+- External dependencies: Uses Obsidian's built-in `requestUrl` API; no third-party analytics SDK is used.
+- Data sent: Request URL, method, headers, and optional body/query you configure.
+- Data stored locally: Cached responses in vault folder `.data-fetcher-cache` and plugin settings in Obsidian plugin data.
+- Data shared externally: Only with endpoint services you explicitly configure.
 
 ## Support
 
-If you encounter any issues or have feature requests, please file them on the [GitHub issues page](https://github.com/qf3l3k/obsidian-api-fetcher/issues).
-
-
-
-If you like this plugin you can support it's development and ...
-
-<a href="https://www.buymeacoffee.com/qf3l3k" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style=" height: 60px !important;width: 217px !important;" ></a>
-
-
+- Issues and feature requests: [GitHub Issues](https://github.com/qf3l3k/obsidian-api-fetcher/issues)
 
 ## License
 
