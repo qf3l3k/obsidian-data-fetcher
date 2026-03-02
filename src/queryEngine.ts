@@ -18,17 +18,49 @@ export interface QueryResult {
     error?: string;
 }
 
+function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVariables?: Record<string, any> } {
+    const normalizedAliasLine = aliasLine.startsWith('=@') ? aliasLine.substring(1).trim() : aliasLine;
+    const inlineCallPattern = /^@([A-Za-z0-9._-]+)\s*(?:\(([\s\S]*)\))?\s*$/;
+    const match = normalizedAliasLine.match(inlineCallPattern);
+
+    if (!match) {
+        throw new Error(`Invalid endpoint alias reference: "${aliasLine}"`);
+    }
+
+    const alias = match[1];
+    const inlineVariablesJson = match[2];
+
+    if (inlineVariablesJson === undefined) {
+        return { alias };
+    }
+
+    try {
+        const parsedVariables = JSON.parse(inlineVariablesJson.trim());
+        if (!parsedVariables || typeof parsedVariables !== 'object' || Array.isArray(parsedVariables)) {
+            throw new Error('Inline variables must be a JSON object');
+        }
+
+        return {
+            alias,
+            inlineVariables: parsedVariables as Record<string, any>
+        };
+    } catch (error) {
+        throw new Error(`Invalid inline variables JSON: ${error.message}`);
+    }
+}
+
 /**
  * Parse the data query from the codeblock
  */
 export function parseDataQuery(source: string, settings: DataFetcherSettings): QueryParams {
     try {
+        const trimmedSource = source.trim();
         // Check if using reference or direct definition
-        if (source.trim().startsWith('@')) {
+        if (trimmedSource.startsWith('@') || trimmedSource.startsWith('=@')) {
             // Using a reference to predefined endpoint
-            const lines = source.trim().split('\n');
+            const lines = trimmedSource.split('\n');
             const aliasLine = lines[0].trim();
-            const alias = aliasLine.substring(1); // Remove the @ prefix
+            const { alias, inlineVariables } = parseAliasReferenceLine(aliasLine);
             
             // Find the endpoint by alias
             const endpoint = settings.endpoints.find(e => e.alias === alias);
@@ -44,6 +76,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                 method: endpoint.method,
                 headers: { ...endpoint.headers }
             };
+
+            if (inlineVariables) {
+                queryParams.variables = inlineVariables;
+            }
             
             // Process remaining lines as additional parameters
             for (let i = 1; i < lines.length; i++) {

@@ -27,7 +27,7 @@ A plugin for [Obsidian](https://obsidian.md) that fetches data from external end
 
 ### Manual
 
-1. Download the latest release from the [repository](https://github.com/qf3l3k/obsidian-api-fetcher).
+1. Download the latest release from the [repository](https://github.com/qf3l3k/obsidian-data-fetcher).
 2. Place the release files in your vault at `.obsidian/plugins/data-fetcher`.
 3. Enable the plugin in Obsidian settings.
 
@@ -54,6 +54,20 @@ A plugin for [Obsidian](https://obsidian.md) that fetches data from external end
 ```data-query
 @my-api-alias
 body: {"id":123}
+```
+
+### 3. Alias With Call-Site Variables
+
+For GraphQL aliases, you can pass variables inline from the call location:
+
+```data-query
+@github-api({"first": 5, "after": null})
+```
+
+You can also use the `=@alias(...)` variant:
+
+```data-query
+=@github-api({"first": 5})
 ```
 
 ### GraphQL Example
@@ -88,7 +102,7 @@ This plugin communicates with external services and stores response data:
 
 ## Support
 
-- Issues and feature requests: [GitHub Issues](https://github.com/qf3l3k/obsidian-api-fetcher/issues)
+- Issues and feature requests: [GitHub Issues](https://github.com/qf3l3k/obsidian-data-fetcher/issues)
 
 ## License
 

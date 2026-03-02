@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Issue #5: support inline call-site variables for endpoint aliases using `@alias({...})` and `=@alias({...})`.
+
 ## [1.0.6] - 2026-03-02
 
 ### Fixed
