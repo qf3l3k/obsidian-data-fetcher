@@ -14,6 +14,7 @@ Supported endpoint types:
 
 - `data-query` code block processor for live request execution
 - Endpoint alias configuration in plugin settings
+- Compact endpoint list with modal editor (v1.1.1)
 - Cache with configurable expiration
 - Cache browser modal (list, preview, delete individual entries)
 - Optional ribbon icon shortcut for cache browser
@@ -177,7 +178,7 @@ Open `Settings -> Data Fetcher`.
 
 Available options:
 - Cache duration (minutes)
-- Endpoint aliases
+- Endpoint aliases (compact list with Name/Type/URL + actions)
 - Per-alias headers
 - Cache clearing
 - Cache browser shortcut
