@@ -1,5 +1,5 @@
 import { App, Editor, EventRef, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-import { DataFetcherSettings, DEFAULT_SETTINGS } from './src/settings';
+import { DataFetcherSettings, DEFAULT_SETTINGS, EndpointConfig } from './src/settings';
 import { parseDataQuery, executeQuery, QueryParams, QueryResult } from './src/queryEngine';
 import { CacheManager } from './src/cacheManager';
 
@@ -827,113 +827,117 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Endpoint aliases')
 			.setHeading();
-		
-		const endpointList = containerEl.createEl('div', {cls: 'endpoint-list'});
-		
-		// Create UI for each existing endpoint
-		this.plugin.settings.endpoints.forEach((endpoint, index) => {
-			this.createEndpointSetting(endpointList, endpoint, index);
-		});
-		
-		// Add new endpoint button
+
+		this.renderEndpointTable(containerEl);
+
 		new Setting(containerEl)
 			.addButton(button => button
 				.setButtonText('Add endpoint')
-				.onClick(async () => {
-					this.plugin.settings.endpoints.push({
-						alias: '',
-						url: '',
-						method: 'GET',
-						type: 'rest',
-						headers: {}
-					});
-					await this.plugin.saveSettings();
-					this.display();
-				}));
-	}
-	
-	createEndpointSetting(container: HTMLElement, endpoint: any, index: number) {
-		const endpointEl = container.createEl('div', {cls: 'endpoint-item'});
-		
-		new Setting(endpointEl)
-			.setName('Alias')
-			.addText(text => text
-				.setPlaceholder('api-name')
-				.setValue(endpoint.alias)
-				.onChange(async (value) => {
-					this.plugin.settings.endpoints[index].alias = value;
-					await this.plugin.saveSettings();
-				}));
-				
-		new Setting(endpointEl)
-			.setName('Type')
-			.addDropdown(dropdown => dropdown
-				.addOption('rest', 'REST')
-				.addOption('graphql', 'GraphQL')
-				.addOption('grpc', 'gRPC')
-				.addOption('rpc', 'RPC')
-				.setValue(endpoint.type)
-				.onChange(async (value) => {
-					const validTypes = ["rest", "graphql", "grpc", "rpc"];
-                    if (validTypes.includes(value)) {
-                        this.plugin.settings.endpoints[index].type = value as "rest" | "graphql" | "grpc" | "rpc";
-                    } else {
-                        // Default to REST if invalid type
-                        this.plugin.settings.endpoints[index].type = "rest";
-                    }
-					await this.plugin.saveSettings();
-					this.display();
-				}));
-				
-		new Setting(endpointEl)
-			.setName('URL')
-			.addText(text => text
-				.setPlaceholder('https://api.example.com')
-				.setValue(endpoint.url)
-				.onChange(async (value) => {
-					this.plugin.settings.endpoints[index].url = value;
-					await this.plugin.saveSettings();
-				}));
-				
-		// Add different fields based on endpoint type
-		if (endpoint.type === 'rest' || endpoint.type === 'rpc') {
-			new Setting(endpointEl)
-				.setName('Method')
-				.addDropdown(dropdown => dropdown
-					.addOption('GET', 'GET')
-					.addOption('POST', 'POST')
-					.addOption('PUT', 'PUT')
-					.addOption('DELETE', 'DELETE')
-					.setValue(endpoint.method)
-					.onChange(async (value) => {
-						this.plugin.settings.endpoints[index].method = value;
-						await this.plugin.saveSettings();
-					}));
-		}
-		
-		// Add headers section
-		new Setting(endpointEl)
-			.setName('Headers')
-			.setDesc('Add headers for this endpoint')
-			.addButton(button => button
-				.setButtonText('Manage headers')
+				.setCta()
 				.onClick(() => {
-					new HeadersModal(this.app, endpoint.headers, async (headers) => {
-						this.plugin.settings.endpoints[index].headers = headers;
+					const newEndpoint = this.buildDefaultEndpoint();
+					new EndpointEditorModal(this.app, newEndpoint, async (savedEndpoint) => {
+						this.plugin.settings.endpoints.push(savedEndpoint);
 						await this.plugin.saveSettings();
+						this.display();
 					}).open();
 				}));
-				
-		// Delete button
-		new Setting(endpointEl)
-			.addButton(button => button
-				.setButtonText('Delete')
-				.setClass('data-fetcher-delete-btn')
-				.onClick(async () => {
-					this.plugin.settings.endpoints.splice(index, 1);
+	}
+
+	private buildDefaultEndpoint(): EndpointConfig {
+		return {
+			alias: '',
+			url: '',
+			method: 'GET',
+			type: 'rest',
+			headers: {}
+		};
+	}
+
+	private endpointTypeLabel(type: EndpointConfig['type']): string {
+		if (type === 'rest') return 'REST';
+		if (type === 'graphql') return 'GraphQL';
+		if (type === 'grpc') return 'gRPC';
+		return 'RPC';
+	}
+
+	private truncateUrl(url: string, maxLen = 72): string {
+		if (!url) return '-';
+		if (url.length <= maxLen) return url;
+		return `${url.substring(0, maxLen - 1)}...`;
+	}
+
+	private renderEndpointTable(containerEl: HTMLElement): void {
+		const table = containerEl.createEl('div', { cls: 'data-fetcher-endpoint-table' });
+		const header = table.createEl('div', { cls: 'data-fetcher-endpoint-row data-fetcher-endpoint-row-header' });
+		header.createEl('div', { text: 'Name', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-alias' });
+		header.createEl('div', { text: 'Type', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-type' });
+		header.createEl('div', { text: 'URL', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-url' });
+		header.createEl('div', { text: 'Headers', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-headers' });
+		header.createEl('div', { text: 'Actions', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-actions' });
+
+		if (this.plugin.settings.endpoints.length === 0) {
+			const empty = table.createEl('div', { cls: 'data-fetcher-endpoint-empty' });
+			empty.setText('No endpoints configured yet.');
+			return;
+		}
+
+		this.plugin.settings.endpoints.forEach((endpoint, index) => {
+			const row = table.createEl('div', { cls: 'data-fetcher-endpoint-row' });
+			row.createEl('div', {
+				text: endpoint.alias?.trim() || '(unnamed)',
+				cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-alias'
+			});
+			row.createEl('div', {
+				text: this.endpointTypeLabel(endpoint.type),
+				cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-type'
+			});
+			row.createEl('div', {
+				text: this.truncateUrl(endpoint.url),
+				cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-url'
+			});
+			row.createEl('div', {
+				text: String(Object.keys(endpoint.headers || {}).length),
+				cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-headers'
+			});
+			const actions = row.createEl('div', {
+				cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-actions data-fetcher-endpoint-actions'
+			});
+
+			actions.createEl('button', { text: 'Edit' }).addEventListener('click', () => {
+				const draft = { ...endpoint, headers: { ...(endpoint.headers || {}) } };
+				new EndpointEditorModal(this.app, draft, async (savedEndpoint) => {
+					this.plugin.settings.endpoints[index] = savedEndpoint;
 					await this.plugin.saveSettings();
 					this.display();
-				}));
+				}).open();
+			});
+
+			actions.createEl('button', { text: 'Duplicate' }).addEventListener('click', () => {
+				const duplicateAlias = endpoint.alias ? `${endpoint.alias}-copy` : '';
+				const draft: EndpointConfig = {
+					...endpoint,
+					alias: duplicateAlias,
+					headers: { ...(endpoint.headers || {}) }
+				};
+				new EndpointEditorModal(this.app, draft, async (savedEndpoint) => {
+					this.plugin.settings.endpoints.push(savedEndpoint);
+					await this.plugin.saveSettings();
+					this.display();
+				}).open();
+			});
+
+			actions.createEl('button', { text: 'Delete', cls: 'mod-warning' }).addEventListener('click', async () => {
+				const alias = endpoint.alias?.trim() || 'this endpoint';
+				const shouldDelete = window.confirm(`Delete ${alias}?`);
+				if (!shouldDelete) {
+					return;
+				}
+				this.plugin.settings.endpoints.splice(index, 1);
+				await this.plugin.saveSettings();
+				this.display();
+			});
+		});
 	}
 
     async updateCacheInfo(containerEl: HTMLElement) {
@@ -950,6 +954,151 @@ class DataFetcherSettingTab extends PluginSettingTab {
             text: `Cache contains ${cacheInfo.count} items (${formatSize(cacheInfo.size)})`
         });
     }	
+}
+
+class EndpointEditorModal extends Modal {
+	private endpoint: EndpointConfig;
+	private onSubmit: (endpoint: EndpointConfig) => void;
+	private methodSettingEl: HTMLElement | null = null;
+	private headersSummaryEl: HTMLElement | null = null;
+
+	constructor(app: App, endpoint: EndpointConfig, onSubmit: (endpoint: EndpointConfig) => void) {
+		super(app);
+		this.endpoint = {
+			...endpoint,
+			headers: { ...(endpoint.headers || {}) },
+			method: endpoint.method || 'GET'
+		};
+		this.onSubmit = onSubmit;
+	}
+
+	private updateHeadersSummary(): void {
+		if (!this.headersSummaryEl) {
+			return;
+		}
+		const count = Object.keys(this.endpoint.headers || {}).length;
+		this.headersSummaryEl.setText(`${count} header${count === 1 ? '' : 's'} configured`);
+	}
+
+	private renderMethodSetting(containerEl: HTMLElement): void {
+		if (this.methodSettingEl) {
+			this.methodSettingEl.remove();
+			this.methodSettingEl = null;
+		}
+
+		if (this.endpoint.type !== 'rest' && this.endpoint.type !== 'rpc') {
+			return;
+		}
+
+		this.methodSettingEl = containerEl.createDiv();
+		new Setting(this.methodSettingEl)
+			.setName('Method')
+			.setDesc('HTTP method for REST/RPC requests')
+			.addDropdown(dropdown => dropdown
+				.addOption('GET', 'GET')
+				.addOption('POST', 'POST')
+				.addOption('PUT', 'PUT')
+				.addOption('DELETE', 'DELETE')
+				.setValue(this.endpoint.method || 'GET')
+				.onChange(value => {
+					this.endpoint.method = value;
+				}));
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		this.modalEl.addClass('data-fetcher-endpoint-editor-modal');
+		contentEl.addClass('data-fetcher-endpoint-editor');
+
+		new Setting(contentEl)
+			.setName('Endpoint editor')
+			.setHeading();
+
+		new Setting(contentEl)
+			.setName('Alias')
+			.setDesc('Endpoint reference name used in notes, e.g. @my-api')
+			.addText(text => text
+				.setPlaceholder('my-api')
+				.setValue(this.endpoint.alias || '')
+				.onChange(value => {
+					this.endpoint.alias = value.trim();
+				}));
+
+		new Setting(contentEl)
+			.setName('Type')
+			.addDropdown(dropdown => dropdown
+				.addOption('rest', 'REST')
+				.addOption('graphql', 'GraphQL')
+				.addOption('grpc', 'gRPC')
+				.addOption('rpc', 'RPC')
+				.setValue(this.endpoint.type)
+				.onChange(value => {
+					const validTypes: EndpointConfig['type'][] = ['rest', 'graphql', 'grpc', 'rpc'];
+					this.endpoint.type = validTypes.includes(value as EndpointConfig['type'])
+						? (value as EndpointConfig['type'])
+						: 'rest';
+					this.renderMethodSetting(contentEl);
+				}));
+
+		new Setting(contentEl)
+			.setName('URL')
+			.setDesc('Endpoint URL')
+			.addText(text => text
+				.setPlaceholder('https://api.example.com')
+				.setValue(this.endpoint.url || '')
+				.onChange(value => {
+					this.endpoint.url = value.trim();
+				}));
+
+		this.renderMethodSetting(contentEl);
+
+		new Setting(contentEl)
+			.setName('Headers')
+			.setDesc('Authentication and custom request headers')
+			.addButton(button => button
+				.setButtonText('Manage headers')
+				.onClick(() => {
+					new HeadersModal(this.app, this.endpoint.headers || {}, (headers) => {
+						this.endpoint.headers = headers;
+						this.updateHeadersSummary();
+					}).open();
+				}));
+
+		this.headersSummaryEl = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-header-summary' });
+		this.updateHeadersSummary();
+
+		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
+		actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
+		actions.createEl('button', { text: 'Save', cls: 'mod-cta' }).addEventListener('click', () => {
+			if (!this.endpoint.alias?.trim()) {
+				new Notice('Alias is required.');
+				return;
+			}
+			if (!this.endpoint.url?.trim()) {
+				new Notice('URL is required.');
+				return;
+			}
+
+			if (this.endpoint.type === 'graphql' || this.endpoint.type === 'grpc') {
+				this.endpoint.method = 'POST';
+			}
+
+			this.onSubmit({
+				alias: this.endpoint.alias.trim(),
+				type: this.endpoint.type,
+				url: this.endpoint.url.trim(),
+				method: this.endpoint.method || 'GET',
+				headers: { ...(this.endpoint.headers || {}) }
+			});
+			this.close();
+		});
+	}
+
+	onClose() {
+		this.modalEl.removeClass('data-fetcher-endpoint-editor-modal');
+		this.contentEl.empty();
+	}
 }
 
 class CacheBrowserModal extends Modal {

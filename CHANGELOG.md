@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-03-03
+
+### Added
+- Added compact endpoint list view in settings with columns for name, type, URL, headers count, and row actions.
+- Added endpoint editor modal for create/edit flows to keep advanced endpoint details out of the main settings list.
+- Added endpoint row actions: Edit, Duplicate, and Delete.
+
+### Changed
+- Updated endpoint settings layout for better readability when many aliases exist.
+- Reduced endpoint list font size and tightened spacing to better match Obsidian settings styling and avoid clipped action buttons.
+
 ## [1.1.0] - 2026-03-02
 
 ### Added

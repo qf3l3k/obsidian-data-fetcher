@@ -129,18 +129,6 @@
 }
 
 /* Settings styles */
-.endpoint-item {
-    margin-bottom: 20px;
-    padding: 15px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 5px;
-    background-color: var(--background-secondary);
-}
-
-.endpoint-list {
-    margin-bottom: 20px;
-}
-
 .header-row {
     display: flex;
     margin-bottom: 8px;
@@ -149,6 +137,86 @@
 .header-row input {
     flex-grow: 1;
     margin-right: 8px;
+}
+
+.data-fetcher-endpoint-table {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    font-size: var(--font-ui-smaller);
+}
+
+.data-fetcher-endpoint-row {
+    display: grid;
+    grid-template-columns: minmax(84px, 1fr) 72px minmax(140px, 2fr) 64px minmax(150px, 1.2fr);
+    gap: 6px;
+    align-items: center;
+    padding: 7px 9px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.data-fetcher-endpoint-row:last-child {
+    border-bottom: none;
+}
+
+.data-fetcher-endpoint-row-header {
+    background-color: var(--background-secondary);
+    font-weight: 600;
+}
+
+.data-fetcher-endpoint-col {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.data-fetcher-endpoint-col-alias {
+    font-family: var(--font-monospace);
+}
+
+.data-fetcher-endpoint-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
+.data-fetcher-endpoint-col-actions {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.data-fetcher-endpoint-actions button {
+    font-size: var(--font-ui-smaller);
+    padding: 2px 6px;
+}
+
+.data-fetcher-endpoint-empty {
+    color: var(--text-muted);
+    padding: 12px;
+    font-style: italic;
+}
+
+.data-fetcher-endpoint-editor-modal {
+    width: min(760px, 92vw);
+    max-width: min(760px, 92vw);
+}
+
+.data-fetcher-endpoint-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.data-fetcher-endpoint-header-summary {
+    margin-top: -4px;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    font-size: 0.85em;
 }
 
 .data-fetcher-delete-btn {
