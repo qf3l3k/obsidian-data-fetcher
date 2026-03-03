@@ -2,7 +2,9 @@
 
 Data Fetcher is an [Obsidian](https://obsidian.md) plugin that runs requests against external data endpoints and renders the result directly in notes.
 
-[![Buy Me a Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/qf3l3k)
+<a href="https://buymeacoffee.com/qf3l3k">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" width="180">
+</a>
 
 Supported endpoint types:
 - REST APIs
