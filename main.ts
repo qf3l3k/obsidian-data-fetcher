@@ -822,6 +822,20 @@ class DataFetcherSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.updateCacheRibbonIcon();
 				}));
+
+		new Setting(containerEl)
+			.setName('Endpoint import/export')
+			.setDesc('Move endpoint aliases between devices using a JSON file')
+			.addButton(button => button
+				.setButtonText('Export endpoints')
+				.onClick(() => {
+					this.exportEndpoints();
+				}))
+			.addButton(button => button
+				.setButtonText('Import endpoints')
+				.onClick(() => {
+					void this.importEndpoints();
+				}));
 				
 		// Endpoint aliases section
 		new Setting(containerEl)
@@ -940,6 +954,167 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		});
 	}
 
+	private exportEndpoints(): void {
+		const payload = {
+			version: 1,
+			exportedAt: new Date().toISOString(),
+			endpoints: this.plugin.settings.endpoints
+		};
+		const json = JSON.stringify(payload, null, 2);
+		const blob = new Blob([json], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement('a');
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+		anchor.href = url;
+		anchor.download = `data-fetcher-endpoints-${timestamp}.json`;
+		document.body.appendChild(anchor);
+		anchor.click();
+		document.body.removeChild(anchor);
+		URL.revokeObjectURL(url);
+		new Notice(`Exported ${this.plugin.settings.endpoints.length} endpoint(s)`);
+	}
+
+	private readFileAsText(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result || ''));
+			reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+			reader.readAsText(file);
+		});
+	}
+
+	private normalizeHeaders(value: unknown): Record<string, string> {
+		if (!value || typeof value !== 'object' || Array.isArray(value)) {
+			return {};
+		}
+
+		const normalized: Record<string, string> = {};
+		for (const [key, headerValue] of Object.entries(value as Record<string, unknown>)) {
+			if (!key || typeof key !== 'string') {
+				continue;
+			}
+			if (headerValue === null || headerValue === undefined) {
+				continue;
+			}
+			normalized[key] = String(headerValue);
+		}
+		return normalized;
+	}
+
+	private parseEndpointImport(rawEndpoint: unknown): EndpointConfig | null {
+		if (!rawEndpoint || typeof rawEndpoint !== 'object' || Array.isArray(rawEndpoint)) {
+			return null;
+		}
+
+		const endpoint = rawEndpoint as Record<string, unknown>;
+		const alias = typeof endpoint.alias === 'string' ? endpoint.alias.trim() : '';
+		const url = typeof endpoint.url === 'string' ? endpoint.url.trim() : '';
+		const typeValue = typeof endpoint.type === 'string' ? endpoint.type : '';
+		const validTypes: EndpointConfig['type'][] = ['rest', 'graphql', 'grpc', 'rpc'];
+
+		if (!alias || !url || !validTypes.includes(typeValue as EndpointConfig['type'])) {
+			return null;
+		}
+
+		const type = typeValue as EndpointConfig['type'];
+		let method = typeof endpoint.method === 'string' ? endpoint.method.toUpperCase() : 'GET';
+		if (type === 'graphql' || type === 'grpc') {
+			method = 'POST';
+		}
+
+		const normalized: EndpointConfig = {
+			alias,
+			url,
+			method,
+			type,
+			headers: this.normalizeHeaders(endpoint.headers)
+		};
+
+		if (typeof endpoint.body === 'string') {
+			normalized.body = endpoint.body;
+		}
+		if (typeof endpoint.query === 'string') {
+			normalized.query = endpoint.query;
+		}
+
+		return normalized;
+	}
+
+	private extractImportedEndpoints(payload: unknown): unknown[] {
+		if (Array.isArray(payload)) {
+			return payload;
+		}
+		if (payload && typeof payload === 'object' && Array.isArray((payload as { endpoints?: unknown[] }).endpoints)) {
+			return (payload as { endpoints: unknown[] }).endpoints;
+		}
+		return [];
+	}
+
+	private async importEndpoints(): Promise<void> {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json,application/json';
+
+		input.addEventListener('change', async () => {
+			const selectedFile = input.files?.item(0);
+			if (!selectedFile) {
+				return;
+			}
+
+			try {
+				const text = await this.readFileAsText(selectedFile);
+				const parsed = JSON.parse(text) as unknown;
+				const rawEndpoints = this.extractImportedEndpoints(parsed);
+				if (rawEndpoints.length === 0) {
+					new Notice('No endpoints found in import file');
+					return;
+				}
+
+				const validEndpoints: EndpointConfig[] = [];
+				let skipped = 0;
+				for (const rawEndpoint of rawEndpoints) {
+					const endpoint = this.parseEndpointImport(rawEndpoint);
+					if (!endpoint) {
+						skipped++;
+						continue;
+					}
+					validEndpoints.push(endpoint);
+				}
+
+				if (validEndpoints.length === 0) {
+					new Notice('Import failed: no valid endpoints found');
+					return;
+				}
+
+				new EndpointImportModeModal(this.app, validEndpoints.length, skipped, async (mode) => {
+					if (mode === 'replace') {
+						this.plugin.settings.endpoints = validEndpoints;
+					} else {
+						const merged = [...this.plugin.settings.endpoints];
+						for (const endpoint of validEndpoints) {
+							const existingIndex = merged.findIndex(item => item.alias === endpoint.alias);
+							if (existingIndex >= 0) {
+								merged[existingIndex] = endpoint;
+							} else {
+								merged.push(endpoint);
+							}
+						}
+						this.plugin.settings.endpoints = merged;
+					}
+
+					await this.plugin.saveSettings();
+					this.display();
+					const modeLabel = mode === 'replace' ? 'replaced' : 'merged';
+					new Notice(`Imported ${validEndpoints.length} endpoint(s), ${skipped} skipped (${modeLabel})`);
+				}).open();
+			} catch (error) {
+				new Notice(`Import failed: ${error.message}`);
+			}
+		}, { once: true });
+
+		input.click();
+	}
+
     async updateCacheInfo(containerEl: HTMLElement) {
         const cacheInfo = await this.plugin.cacheManager.getCacheInfo();
         containerEl.empty();
@@ -954,6 +1129,50 @@ class DataFetcherSettingTab extends PluginSettingTab {
             text: `Cache contains ${cacheInfo.count} items (${formatSize(cacheInfo.size)})`
         });
     }	
+}
+
+class EndpointImportModeModal extends Modal {
+	private validCount: number;
+	private skippedCount: number;
+	private onSubmit: (mode: 'merge' | 'replace') => Promise<void>;
+
+	constructor(app: App, validCount: number, skippedCount: number, onSubmit: (mode: 'merge' | 'replace') => Promise<void>) {
+		super(app);
+		this.validCount = validCount;
+		this.skippedCount = skippedCount;
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		new Setting(contentEl)
+			.setName('Import endpoints')
+			.setHeading();
+
+		contentEl.createEl('p', {
+			text: `Valid endpoints: ${this.validCount}. Skipped entries: ${this.skippedCount}.`
+		});
+		contentEl.createEl('p', {
+			text: 'Merge updates existing aliases and adds new ones. Replace overwrites all current endpoints.'
+		});
+
+		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
+		actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
+		actions.createEl('button', { text: 'Merge', cls: 'mod-cta' }).addEventListener('click', async () => {
+			await this.onSubmit('merge');
+			this.close();
+		});
+		actions.createEl('button', { text: 'Replace', cls: 'mod-warning' }).addEventListener('click', async () => {
+			await this.onSubmit('replace');
+			this.close();
+		});
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
 }
 
 class EndpointEditorModal extends Modal {

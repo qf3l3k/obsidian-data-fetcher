@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-03-03
+
+### Added
+- Endpoint import/export in settings for moving alias configurations between devices.
+- Import supports both full export payload (`{ version, exportedAt, endpoints }`) and plain endpoint array JSON.
+
+### Changed
+- Endpoint import now supports `Merge` (update by alias + append new) and `Replace` (overwrite all current endpoints) modes with validation/skip summary.
+
 ## [1.1.1] - 2026-03-03
 
 ### Added
