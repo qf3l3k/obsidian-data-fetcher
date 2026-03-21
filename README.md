@@ -17,6 +17,7 @@ Supported endpoint types:
 - `data-query` code block processor for live request execution
 - Endpoint alias configuration in plugin settings
 - Compact endpoint list with modal editor (v1.1.1)
+- Endpoint import/export for moving aliases between devices (v1.1.2)
 - Cache with configurable expiration
 - Cache browser modal (list, preview, delete individual entries)
 - Optional ribbon icon shortcut for cache browser
@@ -162,6 +163,7 @@ Example:
 Common fields:
 - `type`: `rpc`
 - `url`: RPC endpoint URL
+- `method`: always `POST`
 - `query`: method name
 - `body`: params object
 - `headers`: object
@@ -181,6 +183,7 @@ Open `Settings -> Data Fetcher`.
 Available options:
 - Cache duration (minutes)
 - Endpoint aliases (compact list with Name/Type/URL + actions)
+- Endpoint import/export (JSON)
 - Per-alias headers
 - Cache clearing
 - Cache browser shortcut
@@ -220,6 +223,7 @@ Use command `Open cache browser` (or settings button) to:
 - `Path "..." not found`: check nested field names/indexes in response data.
 - `Table format requires an array of objects`: update `path` to point at an object array, or use `format: json`.
 - `property is required when output: frontmatter is used`: add a property path.
+- `Response too large for this device`: reduce payload size, add filters/limits, or use a proxy endpoint.
 - No result refresh from command: ensure active pane is a markdown file.
 - Build fails on PowerShell script policy: run via `cmd /c npm run build`.
 

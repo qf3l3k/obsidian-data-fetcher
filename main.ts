@@ -674,49 +674,8 @@ export default class DataFetcherPlugin extends Plugin {
                 }
             }
             
-            // Fallback: Try to use the Obsidian view to locate the code block
-            // This is a secondary approach that might work in some cases
-            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (markdownView && markdownView.getMode() === 'source') {
-                // Try to find the code block in the source by looking for data-query blocks
-                const text = editor.getValue();
-                const lines = text.split('\n');
-                
-                for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].trim() === '```data-query') {
-                        // Found a start marker, now find the end
-                        let endLine = -1;
-                        for (let j = i + 1; j < lines.length; j++) {
-                            if (lines[j].trim() === '```') {
-                                endLine = j;
-                                break;
-                            }
-                        }
-                        
-                        if (endLine > i) {
-                            // Replace the entire code block
-                            const start = { line: i, ch: 0 };
-                            const end = { line: endLine, ch: lines[endLine].length };
-                            
-                            editor.transaction({
-                                changes: [
-                                    {
-                                        from: start,
-                                        to: end,
-                                        text: commentedData
-                                    }
-                                ]
-                            });
-                            
-                            new Notice('Data block replaced with static content');
-                            return;
-                        }
-                    }
-                }
-            }
-            
-            // If all attempts to find the code block failed, insert at cursor position
-            const cursor = editor.getCursor();
+			// If exact block location is unavailable, avoid replacing the wrong data-query block.
+			const cursor = editor.getCursor();
             
             editor.transaction({
                 changes: [
@@ -728,7 +687,7 @@ export default class DataFetcherPlugin extends Plugin {
                 ]
             });
             
-            new Notice('Data saved to note at cursor position');
+			new Notice('Block location unavailable, so data was inserted at the cursor position');
             
         } catch (error) {
             console.error("Error saving data to note:", error);
@@ -850,7 +809,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 				.setCta()
 				.onClick(() => {
 					const newEndpoint = this.buildDefaultEndpoint();
-					new EndpointEditorModal(this.app, newEndpoint, async (savedEndpoint) => {
+					new EndpointEditorModal(this.app, newEndpoint, this.collectExistingAliases(), async (savedEndpoint) => {
 						this.plugin.settings.endpoints.push(savedEndpoint);
 						await this.plugin.saveSettings();
 						this.display();
@@ -866,6 +825,21 @@ class DataFetcherSettingTab extends PluginSettingTab {
 			type: 'rest',
 			headers: {}
 		};
+	}
+
+	private collectExistingAliases(excludeAlias?: string): Set<string> {
+		const aliases = new Set<string>();
+		for (const endpoint of this.plugin.settings.endpoints) {
+			const alias = endpoint.alias?.trim();
+			if (!alias) {
+				continue;
+			}
+			if (excludeAlias && alias === excludeAlias) {
+				continue;
+			}
+			aliases.add(alias);
+		}
+		return aliases;
 	}
 
 	private endpointTypeLabel(type: EndpointConfig['type']): string {
@@ -920,7 +894,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 
 			actions.createEl('button', { text: 'Edit' }).addEventListener('click', () => {
 				const draft = { ...endpoint, headers: { ...(endpoint.headers || {}) } };
-				new EndpointEditorModal(this.app, draft, async (savedEndpoint) => {
+				new EndpointEditorModal(this.app, draft, this.collectExistingAliases(endpoint.alias), async (savedEndpoint) => {
 					this.plugin.settings.endpoints[index] = savedEndpoint;
 					await this.plugin.saveSettings();
 					this.display();
@@ -934,7 +908,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 					alias: duplicateAlias,
 					headers: { ...(endpoint.headers || {}) }
 				};
-				new EndpointEditorModal(this.app, draft, async (savedEndpoint) => {
+				new EndpointEditorModal(this.app, draft, this.collectExistingAliases(), async (savedEndpoint) => {
 					this.plugin.settings.endpoints.push(savedEndpoint);
 					await this.plugin.saveSettings();
 					this.display();
@@ -1018,7 +992,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 
 		const type = typeValue as EndpointConfig['type'];
 		let method = typeof endpoint.method === 'string' ? endpoint.method.toUpperCase() : 'GET';
-		if (type === 'graphql' || type === 'grpc') {
+		if (type === 'graphql' || type === 'grpc' || type === 'rpc') {
 			method = 'POST';
 		}
 
@@ -1048,6 +1022,23 @@ class DataFetcherSettingTab extends PluginSettingTab {
 			return (payload as { endpoints: unknown[] }).endpoints;
 		}
 		return [];
+	}
+
+	private dedupeImportedEndpoints(endpoints: EndpointConfig[]): { endpoints: EndpointConfig[]; duplicateAliases: number } {
+		const deduped = new Map<string, EndpointConfig>();
+		let duplicateAliases = 0;
+
+		for (const endpoint of endpoints) {
+			if (deduped.has(endpoint.alias)) {
+				duplicateAliases++;
+			}
+			deduped.set(endpoint.alias, endpoint);
+		}
+
+		return {
+			endpoints: Array.from(deduped.values()),
+			duplicateAliases
+		};
 	}
 
 	private async importEndpoints(): Promise<void> {
@@ -1086,12 +1077,15 @@ class DataFetcherSettingTab extends PluginSettingTab {
 					return;
 				}
 
-				new EndpointImportModeModal(this.app, validEndpoints.length, skipped, async (mode) => {
+				const dedupedImport = this.dedupeImportedEndpoints(validEndpoints);
+				const skippedTotal = skipped + dedupedImport.duplicateAliases;
+
+				new EndpointImportModeModal(this.app, dedupedImport.endpoints.length, skippedTotal, async (mode) => {
 					if (mode === 'replace') {
-						this.plugin.settings.endpoints = validEndpoints;
+						this.plugin.settings.endpoints = dedupedImport.endpoints;
 					} else {
 						const merged = [...this.plugin.settings.endpoints];
-						for (const endpoint of validEndpoints) {
+						for (const endpoint of dedupedImport.endpoints) {
 							const existingIndex = merged.findIndex(item => item.alias === endpoint.alias);
 							if (existingIndex >= 0) {
 								merged[existingIndex] = endpoint;
@@ -1105,7 +1099,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.display();
 					const modeLabel = mode === 'replace' ? 'replaced' : 'merged';
-					new Notice(`Imported ${validEndpoints.length} endpoint(s), ${skipped} skipped (${modeLabel})`);
+					new Notice(`Imported ${dedupedImport.endpoints.length} endpoint(s), ${skippedTotal} skipped (${modeLabel})`);
 				}).open();
 			} catch (error) {
 				new Notice(`Import failed: ${error.message}`);
@@ -1177,17 +1171,20 @@ class EndpointImportModeModal extends Modal {
 
 class EndpointEditorModal extends Modal {
 	private endpoint: EndpointConfig;
+	private existingAliases: Set<string>;
 	private onSubmit: (endpoint: EndpointConfig) => void;
 	private methodSettingEl: HTMLElement | null = null;
 	private headersSummaryEl: HTMLElement | null = null;
+	private rpcMethodNoticeEl: HTMLElement | null = null;
 
-	constructor(app: App, endpoint: EndpointConfig, onSubmit: (endpoint: EndpointConfig) => void) {
+	constructor(app: App, endpoint: EndpointConfig, existingAliases: Set<string>, onSubmit: (endpoint: EndpointConfig) => void) {
 		super(app);
 		this.endpoint = {
 			...endpoint,
 			headers: { ...(endpoint.headers || {}) },
 			method: endpoint.method || 'GET'
 		};
+		this.existingAliases = existingAliases;
 		this.onSubmit = onSubmit;
 	}
 
@@ -1204,8 +1201,21 @@ class EndpointEditorModal extends Modal {
 			this.methodSettingEl.remove();
 			this.methodSettingEl = null;
 		}
+		if (this.rpcMethodNoticeEl) {
+			this.rpcMethodNoticeEl.remove();
+			this.rpcMethodNoticeEl = null;
+		}
 
-		if (this.endpoint.type !== 'rest' && this.endpoint.type !== 'rpc') {
+		if (this.endpoint.type === 'rpc') {
+			this.endpoint.method = 'POST';
+			this.rpcMethodNoticeEl = containerEl.createDiv();
+			new Setting(this.rpcMethodNoticeEl)
+				.setName('Method')
+				.setDesc('JSON-RPC requests always use POST for compatibility across Obsidian desktop and mobile.');
+			return;
+		}
+
+		if (this.endpoint.type !== 'rest') {
 			return;
 		}
 
@@ -1290,7 +1300,8 @@ class EndpointEditorModal extends Modal {
 		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
 		actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
 		actions.createEl('button', { text: 'Save', cls: 'mod-cta' }).addEventListener('click', () => {
-			if (!this.endpoint.alias?.trim()) {
+			const normalizedAlias = this.endpoint.alias?.trim();
+			if (!normalizedAlias) {
 				new Notice('Alias is required.');
 				return;
 			}
@@ -1298,13 +1309,17 @@ class EndpointEditorModal extends Modal {
 				new Notice('URL is required.');
 				return;
 			}
+			if (this.existingAliases.has(normalizedAlias)) {
+				new Notice(`Alias "${normalizedAlias}" already exists.`);
+				return;
+			}
 
-			if (this.endpoint.type === 'graphql' || this.endpoint.type === 'grpc') {
+			if (this.endpoint.type === 'graphql' || this.endpoint.type === 'grpc' || this.endpoint.type === 'rpc') {
 				this.endpoint.method = 'POST';
 			}
 
 			this.onSubmit({
-				alias: this.endpoint.alias.trim(),
+				alias: normalizedAlias,
 				type: this.endpoint.type,
 				url: this.endpoint.url.trim(),
 				method: this.endpoint.method || 'GET',

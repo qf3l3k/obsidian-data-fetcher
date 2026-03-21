@@ -22,6 +22,17 @@ export interface QueryResult {
     error?: string;
 }
 
+function formatRequestError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes('resource exceeds maximum size')) {
+        return 'Response too large for this device. Reduce payload size, add filters/limits, or use a proxy endpoint.';
+    }
+
+    return message;
+}
+
 function parseOutputFormat(value: string): 'json' | 'table' {
     const normalized = value.trim().toLowerCase();
     if (normalized === 'json' || normalized === 'table') {
@@ -222,7 +233,7 @@ export async function executeQuery(params: QueryParams): Promise<QueryResult> {
         return {
             data: null,
             timestamp: Date.now(),
-            error: error.message
+            error: formatRequestError(error)
         };
     }
 }
@@ -333,7 +344,7 @@ async function executeRpcQuery(params: QueryParams): Promise<any> {
     
     const requestParams: RequestUrlParam = {
         url: params.url,
-        method: params.method || 'POST',
+        method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...(params.headers || {})

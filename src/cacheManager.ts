@@ -33,9 +33,11 @@ export class CacheManager {
     private generateCacheKey(params: QueryParams): string {
         // Create a unique key based on query parameters
         const stringToHash = JSON.stringify({
+            endpoint: params.endpoint,
             url: params.url,
             type: params.type,
             method: params.method,
+            headers: params.headers,
             body: params.body,
             query: params.query,
             variables: params.variables

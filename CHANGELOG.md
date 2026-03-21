@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-03-21
+
+### Fixed
+- Cache keys now include endpoint identity and headers to avoid cross-endpoint cache collisions.
+- RPC requests now always use `POST`, matching JSON-RPC expectations and improving mobile compatibility.
+- Endpoint editor now blocks duplicate aliases, and endpoint import deduplicates aliases before merge/replace.
+- `Save to Note` no longer falls back to replacing the first `data-query` block when source block location is unavailable.
+- Large-response request errors now surface a clearer hint about reducing payload size or using a proxy.
+
 ## [1.1.2] - 2026-03-03
 
 ### Added
