@@ -201,8 +201,16 @@
 }
 
 .data-fetcher-endpoint-editor-modal {
-    width: min(760px, 92vw);
-    max-width: min(760px, 92vw);
+    width: min(920px, 94vw);
+    max-width: min(920px, 94vw);
+}
+
+.data-fetcher-endpoint-url-setting .setting-item-control {
+    flex: 1 1 560px;
+}
+
+.data-fetcher-endpoint-url-setting .setting-item-control input[type="text"] {
+    width: 100%;
 }
 
 .data-fetcher-endpoint-editor-actions {
@@ -240,14 +248,14 @@
 
 .modal.mod-sidebar-layout.data-fetcher-cache-browser-modal,
 .data-fetcher-cache-browser-modal {
-    width: min(1200px, 94vw);
-    max-width: min(1200px, 94vw);
+    width: min(1120px, 94vw);
+    max-width: min(1120px, 94vw);
 }
 
 .data-fetcher-cache-browser {
-    width: min(1160px, 92vw);
-    max-width: min(1160px, 92vw);
-    min-height: 70vh;
+    width: min(1080px, 92vw);
+    max-width: min(1080px, 92vw);
+    min-height: 74vh;
 }
 
 .data-fetcher-cache-toolbar {
@@ -269,9 +277,10 @@
 
 .data-fetcher-cache-split {
     display: grid;
-    grid-template-columns: minmax(320px, 38%) 1fr;
+    grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
     gap: 12px;
-    height: 62vh;
+    height: 68vh;
+    min-height: 0;
 }
 
 .data-fetcher-cache-list,
@@ -280,8 +289,9 @@
     border-radius: 6px;
     background-color: var(--background-secondary);
     padding: 10px;
-    max-height: 420px;
     overflow: auto;
+    min-height: 0;
+    height: 100%;
 }
 
 .data-fetcher-cache-row {
@@ -311,6 +321,13 @@
     margin-top: 3px;
     color: var(--text-muted);
     font-size: 0.8em;
+}
+
+.data-fetcher-cache-url {
+    margin-top: 4px;
+    font-family: var(--font-monospace);
+    font-size: 0.75em;
+    overflow-wrap: anywhere;
 }
 
 .data-fetcher-cache-row-actions {

@@ -1270,7 +1270,7 @@ class EndpointEditorModal extends Modal {
 					this.renderMethodSetting(contentEl);
 				}));
 
-		new Setting(contentEl)
+		const urlSetting = new Setting(contentEl)
 			.setName('URL')
 			.setDesc('Endpoint URL')
 			.addText(text => text
@@ -1279,6 +1279,7 @@ class EndpointEditorModal extends Modal {
 				.onChange(value => {
 					this.endpoint.url = value.trim();
 				}));
+		urlSetting.settingEl.addClass('data-fetcher-endpoint-url-setting');
 
 		this.renderMethodSetting(contentEl);
 
@@ -1342,7 +1343,7 @@ class CacheBrowserModal extends Modal {
 	private summaryContainer: HTMLElement;
 	private filterInput: HTMLInputElement;
 	private selectedCacheKey: string | null = null;
-	private entries: Array<{key: string; path: string; size: number; mtime: number}> = [];
+	private entries: Array<{key: string; path: string; size: number; mtime: number; endpoint?: string; type?: QueryParams['type']; url?: string}> = [];
 
 	constructor(app: App, cacheManager: CacheManager) {
 		super(app);
@@ -1366,9 +1367,22 @@ class CacheBrowserModal extends Modal {
 		pre.createEl('code', { text });
 	}
 
+	private entryLabel(entry: { key: string; endpoint?: string }): string {
+		const endpointLabel = entry.endpoint && entry.endpoint !== 'direct' ? entry.endpoint : 'direct';
+		return `${endpointLabel} - ${entry.key}`;
+	}
+
 	private renderEntries(): void {
 		const filter = this.filterInput?.value?.trim().toLowerCase() || '';
-		const visibleEntries = this.entries.filter(entry => entry.key.toLowerCase().includes(filter));
+		const visibleEntries = this.entries.filter(entry => {
+			const searchable = [
+				entry.key,
+				entry.endpoint || '',
+				entry.type || '',
+				entry.url || ''
+			].join(' ').toLowerCase();
+			return searchable.includes(filter);
+		});
 		const totalSize = visibleEntries.reduce((sum, entry) => sum + entry.size, 0);
 		this.summaryContainer.empty();
 		this.summaryContainer.setText(`Entries: ${visibleEntries.length} (${this.formatBytes(totalSize)})`);
@@ -1385,11 +1399,17 @@ class CacheBrowserModal extends Modal {
 		for (const entry of visibleEntries) {
 			const row = this.entriesContainer.createEl('div', { cls: 'data-fetcher-cache-row' });
 			const meta = row.createEl('div', { cls: 'data-fetcher-cache-row-meta' });
-			meta.createEl('div', { text: entry.key, cls: 'data-fetcher-cache-key' });
+			meta.createEl('div', { text: this.entryLabel(entry), cls: 'data-fetcher-cache-key' });
 			meta.createEl('div', {
-				text: `${this.formatDate(entry.mtime)} | ${this.formatBytes(entry.size)}`,
+				text: `${entry.type ? `${entry.type.toUpperCase()} | ` : ''}${this.formatDate(entry.mtime)} | ${this.formatBytes(entry.size)}`,
 				cls: 'data-fetcher-cache-meta'
 			});
+			if (entry.url) {
+				meta.createEl('div', {
+					text: entry.url,
+					cls: 'data-fetcher-cache-meta data-fetcher-cache-url'
+				});
+			}
 
 			const actions = row.createEl('div', { cls: 'data-fetcher-cache-row-actions' });
 			actions.createEl('button', { text: 'Preview' }).addEventListener('click', async () => {
@@ -1442,7 +1462,7 @@ class CacheBrowserModal extends Modal {
 			cls: 'data-fetcher-cache-filter',
 			attr: {
 				type: 'text',
-				placeholder: 'Filter by cache key...'
+				placeholder: 'Filter by alias, key, type, or URL...'
 			}
 		});
 		this.filterInput.addEventListener('input', () => this.renderEntries());

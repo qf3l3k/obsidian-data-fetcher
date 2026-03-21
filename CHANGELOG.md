@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-03-21
+
+### Added
+- Cache browser entries now display alias-aware labels in the form `<alias/direct> - <hash>`.
+- Cache browser filtering now matches alias, hash, type, and URL.
+
+### Changed
+- Endpoint editor dialog now gives the URL field more horizontal space for long endpoints.
+- Cache browser list and preview panes now use more of the available dialog space.
+- New cache entries store lightweight query metadata so cache browser labels are easier to understand.
+
 ## [1.1.3] - 2026-03-21
 
 ### Fixed

@@ -1,6 +1,16 @@
 import { App, TFile, TFolder } from 'obsidian';
 import { QueryParams, QueryResult } from './queryEngine';
 
+interface CacheEntryMetadata {
+    endpoint?: string;
+    type?: QueryParams['type'];
+    url?: string;
+}
+
+interface StoredCacheEntry extends QueryResult {
+    _meta?: CacheEntryMetadata;
+}
+
 export class CacheManager {
     private app: App;
     private plugin: any;
@@ -74,7 +84,7 @@ export class CacheManager {
             
             // Read the cache file
             const cacheContent = await this.app.vault.read(cacheFile);
-            const cacheData = JSON.parse(cacheContent);
+            const cacheData = JSON.parse(cacheContent) as StoredCacheEntry;
             
             // Check if cache is expired
             const now = Date.now();
@@ -85,7 +95,11 @@ export class CacheManager {
                 return null; // Cache is expired
             }
             
-            return cacheData;
+            return {
+                data: cacheData.data,
+                timestamp: cacheData.timestamp,
+                error: cacheData.error
+            };
         } catch (error) {
             console.error('Error reading from cache:', error);
             return null;
@@ -100,9 +114,17 @@ export class CacheManager {
             await this.ensureCacheFolder();
             const cacheKey = this.generateCacheKey(params);
             const cacheFilePath = `${this.cacheFolder}/${cacheKey}.json`;
+            const storedEntry: StoredCacheEntry = {
+                ...result,
+                _meta: {
+                    endpoint: params.endpoint,
+                    type: params.type,
+                    url: params.url
+                }
+            };
             
             // Create or overwrite the cache file
-            await this.app.vault.adapter.write(cacheFilePath, JSON.stringify(result));
+            await this.app.vault.adapter.write(cacheFilePath, JSON.stringify(storedEntry));
         } catch (error) {
             console.error('Error saving to cache:', error);
         }
@@ -170,11 +192,11 @@ export class CacheManager {
         return `${this.cacheFolder}/${cacheKey}.json`;
     }
 
-    async listCacheEntries(): Promise<Array<{key: string; path: string; size: number; mtime: number}>> {
+    async listCacheEntries(): Promise<Array<{key: string; path: string; size: number; mtime: number; endpoint?: string; type?: QueryParams['type']; url?: string}>> {
         try {
             await this.ensureCacheFolder();
             const listed = await this.app.vault.adapter.list(this.cacheFolder);
-            const entries: Array<{key: string; path: string; size: number; mtime: number}> = [];
+            const entries: Array<{key: string; path: string; size: number; mtime: number; endpoint?: string; type?: QueryParams['type']; url?: string}> = [];
 
             for (const filePath of listed.files) {
                 if (!filePath.endsWith('.json')) {
@@ -191,11 +213,23 @@ export class CacheManager {
                     continue;
                 }
 
+                let metadata: CacheEntryMetadata | undefined;
+                try {
+                    const content = await this.app.vault.adapter.read(filePath);
+                    const parsed = JSON.parse(content) as StoredCacheEntry;
+                    metadata = parsed._meta;
+                } catch (error) {
+                    console.error(`Error reading cache metadata for ${filePath}:`, error);
+                }
+
                 entries.push({
                     key,
                     path: filePath,
                     size: stat.size,
-                    mtime: stat.mtime
+                    mtime: stat.mtime,
+                    endpoint: metadata?.endpoint,
+                    type: metadata?.type,
+                    url: metadata?.url
                 });
             }
 
@@ -218,10 +252,14 @@ export class CacheManager {
             }
 
             const content = await this.app.vault.adapter.read(cacheFilePath);
-            const parsed = JSON.parse(content);
+            const parsed = JSON.parse(content) as StoredCacheEntry;
 
             if (parsed && typeof parsed === 'object' && 'timestamp' in parsed) {
-                return parsed as QueryResult;
+                return {
+                    data: parsed.data,
+                    timestamp: parsed.timestamp,
+                    error: parsed.error
+                };
             }
 
             return null;
