@@ -20,3 +20,434 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# ===========================
+# 🔹 IDE & Editor Settings 🔹
+# ===========================
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/shelf
+.idea/**/dictionaries
+.idea/httpRequests
+.idea/caches/
+.idea/**/dataSources/
+.idea/**/sonarlint/
+.idea/**/aws.xml
+.idea/**/contentModel.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/**/mongoSettings.xml
+
+# Visual Studio Code
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Spyder IDE
+.spyderproject
+.spyproject
+
+# Rope (Python refactoring library)
+.ropeproject/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Eclipse
+.metadata/
+bin/
+tmp/
+
+# ===========================
+# 🔹 Python Build & Packaging 🔹
+# ===========================
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.Python
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so  # Cython extensions
+
+# Build directories & distribution artifacts
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+share/python-wheels/
+MANIFEST
+
+# Configuration with secrets
+config.yaml
+config.yml
+config.json
+settings.json
+
+# ===========================
+# 🔹 Extra Python Tooling 🔹
+# ===========================
+
+# PyInstaller
+*.spec
+*.manifest
+
+# Translations
+*.mo
+*.pot
+
+# pyenv
+.python-version
+
+# CMake
+cmake-build-*/
+
+# Legacy pip
+pip-selfcheck.json
+
+# ===========================
+# 🔹 Dependency Management 🔹
+# ===========================
+
+# Pip, Pipenv, Poetry, PDM
+pip-log.txt
+pip-delete-this-directory.txt
+Pipfile.lock
+poetry.lock
+pdm.lock
+.pdm.toml  # PDM project-wide configurations / Security reports
+.pdm-build/
+
+# Pyflow & PEP 582
+__pypackages__/
+
+# UV package manager
+.uv/
+
+# Ruff cache
+.ruff_cache/
+
+# pdm backend
+security-report.*
+bandit-report.*
+*.sarif
+
+# ===========================
+# 🔹 Testing & Coverage 🔹
+# ===========================
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+dmypy.json
+.dmypy.json
+
+# Mypy type checker
+.mypy_cache/
+.pyre/
+.pytype/
+cython_debug/
+
+# ===========================
+# 🔹 Logs & Temporary Files 🔹
+# ===========================
+
+# Log files
+*.log
+*.out
+*.err
+
+# Log folders
+logs/
+.logs/
+
+# Cache files / Local runtime data
+.cache/
+*.pid
+*.pid.lock
+*.seed
+*.bak
+*.swp
+*.swo
+*.swn
+
+# OS-generated files (Mac, Linux, Windows)
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# ===========================
+# 🔹 Framework-Specific 🔹
+# ===========================
+
+# Django
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy/
+
+# Sphinx Documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ================================
+# 🔐 Secrets & Local Credentials 🔐
+# ================================
+# NEVER commit secrets, credentials, or sensitive configuration!
+
+# Authentication tokens & API keys
+token.pickle
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Credential files / Python keyrings / local auth stores
+credentials.json
+service-account-key.json
+*.keyring
+*.kdb
+*.kdbx
+.keyring/
+.keyrings/
+
+# API keys & secrets in files
+api_keys.py
+secrets.py
+_config_secret.py
+
+# OAuth tokens / Session data / API token caches
+*.token
+*.oauth
+*.session
+*.gpg
+*.pickle
+*.pkl
+*.pickle.*
+*.pkl.*
+token.json
+credentials.json
+client_secret*.json
+oauth*.json
+
+
+# Environment files (usually contain secrets)
+.env
+.env.local
+.env.*
+!.env.example    # Keep example files
+!.env.template   # Keep template files
+.envrc
+
+# Password files
+.passwords
+passwords.txt
+secrets.txt
+
+# Certificate files (unless intentionally public)
+*.crt
+*.cert
+*.der
+
+# Cloud provider credentials & CLI caches
+
+# AWS
+.aws/
+# (If you only want to ignore credentials, use:)
+# .aws/credentials
+# .aws/config
+
+# Google Cloud
+.gcloud/
+# Azure
+.azure/
+
+# Kubernetes configs (often sensitive)
+.kube/
+kubeconfig
+
+# ===========================
+# 🎬 Media outputs (local) 🎬
+# ===========================
+renders/
+render/
+exports/
+export/
+outputs/
+output/
+tmp_media/
+.cache_media/
+
+# Generated media (video/audio/image exports)
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+
+*.mp3
+*.wav
+*.flac
+*.aac
+*.m4a
+*.ogg
+
+*.psd
+*.afphoto
+*.afdesign
+*.afpub
+
+*.blend
+*.aep
+*.prproj
+*.drp
+
+*.gif
+*.tif
+*.tiff
+*.bmp
+
+# Documents
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Archives often used for packaging exports
+*.zip
+*.7z
+*.rar
+
+# ===========================
+# 🔹 Other Configurations 🔹
+# ===========================
+
+# Database files (generic)
+*.db
+*.sqlite
+*.sqlite3
+!docs/demo/*.sqlite
+*.db-journal
+*.sqlite3-journal
+*.fdb
+*.mdb
+
+# Docker & Containerization
+docker-compose.override.yml
+
+# Cloud/Infrastructure secrets
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+terraform.tfvars.json
+
+# Ansible vault files
+vault.yml
+*.vault
+*.vault.yml
+
+# =========================================
+# 🔹Local project planning / prompt files🔹
+# =========================================
+prompt.md
+requirements.md
+private/
+.private/
+
+# =========================================
+# 🤖 Generative AI & coding assistants 🤖
+# =========================================
+
+# Claude Code (Anthropic)
+.claude/
+CLAUDE.local.md
+CLAUDE.md
+
+# Cursor
+.cursor/
+.cursorrules
+.cursorignore
+
+# GitHub Copilot
+.github/copilot-instructions.md
+.copilot/
+
+# Windsurf / Codeium
+.windsurf/
+.codeium/
+
+# OpenAI Codex CLI
+.codex/
+AGENTS.md
+codex.md
+
+# ChatGPT / OpenAI
+.openai/
+
+# Aider
+.aider*
+aider.conf.yml
+
+# Continue
+.continue/
+
+# Generic AI artefacts
+*.ai-context
+*.ai-notes
+ai-notes/
+ai-context/
+scratchpad.md
+todo.md
+TODO.md
+todos.md
+TODOS.md
+notes.md
+NOTES.md
