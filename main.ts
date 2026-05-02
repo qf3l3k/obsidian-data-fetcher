@@ -21,7 +21,6 @@ export default class DataFetcherPlugin extends Plugin {
                 const cachedResult = await this.cacheManager.getFromCache(query);
                 
                 if (cachedResult) {
-                    await this.applyOutputTargetSafely(query, cachedResult, ctx);
                     this.renderResult(cachedResult, el, query, ctx);
                 } else {
                     el.createEl('div', { text: 'Fetching data...', cls: 'data-fetcher-loading' });
@@ -710,6 +709,7 @@ export default class DataFetcherPlugin extends Plugin {
 
 class DataFetcherSettingTab extends PluginSettingTab {
 	plugin: DataFetcherPlugin;
+	private endpointFilter = '';
 
 	constructor(app: App, plugin: DataFetcherPlugin) {
 		super(app, plugin);
@@ -788,7 +788,9 @@ class DataFetcherSettingTab extends PluginSettingTab {
 			.addButton(button => button
 				.setButtonText('Export endpoints')
 				.onClick(() => {
-					this.exportEndpoints();
+					new EndpointExportModal(this.app, this.plugin.settings.endpoints, includeHeaders => {
+						this.exportEndpoints(includeHeaders);
+					}).open();
 				}))
 			.addButton(button => button
 				.setButtonText('Import endpoints')
@@ -800,6 +802,19 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Endpoint aliases')
 			.setHeading();
+
+		const filterEl = containerEl.createEl('input', {
+			cls: 'data-fetcher-endpoint-filter',
+			attr: {
+				type: 'text',
+				placeholder: 'Filter endpoints by alias, type, or URL...'
+			}
+		});
+		filterEl.value = this.endpointFilter;
+		filterEl.addEventListener('input', () => {
+			this.endpointFilter = filterEl.value;
+			this.renderEndpointTable(containerEl);
+		});
 
 		this.renderEndpointTable(containerEl);
 
@@ -856,6 +871,7 @@ class DataFetcherSettingTab extends PluginSettingTab {
 	}
 
 	private renderEndpointTable(containerEl: HTMLElement): void {
+		containerEl.querySelector('.data-fetcher-endpoint-table')?.remove();
 		const table = containerEl.createEl('div', { cls: 'data-fetcher-endpoint-table' });
 		const header = table.createEl('div', { cls: 'data-fetcher-endpoint-row data-fetcher-endpoint-row-header' });
 		header.createEl('div', { text: 'Name', cls: 'data-fetcher-endpoint-col data-fetcher-endpoint-col-alias' });
@@ -870,7 +886,28 @@ class DataFetcherSettingTab extends PluginSettingTab {
 			return;
 		}
 
-		this.plugin.settings.endpoints.forEach((endpoint, index) => {
+		const normalizedFilter = this.endpointFilter.trim().toLowerCase();
+		const visibleEndpoints = this.plugin.settings.endpoints
+			.map((endpoint, index) => ({ endpoint, index }))
+			.filter(({ endpoint }) => {
+				if (!normalizedFilter) {
+					return true;
+				}
+
+				return [
+					endpoint.alias || '',
+					endpoint.type || '',
+					endpoint.url || ''
+				].join(' ').toLowerCase().includes(normalizedFilter);
+			});
+
+		if (visibleEndpoints.length === 0) {
+			const empty = table.createEl('div', { cls: 'data-fetcher-endpoint-empty' });
+			empty.setText('No endpoints match current filter.');
+			return;
+		}
+
+		visibleEndpoints.forEach(({ endpoint, index }) => {
 			const row = table.createEl('div', { cls: 'data-fetcher-endpoint-row' });
 			row.createEl('div', {
 				text: endpoint.alias?.trim() || '(unnamed)',
@@ -928,11 +965,19 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		});
 	}
 
-	private exportEndpoints(): void {
+	private endpointForExport(endpoint: EndpointConfig, includeHeaders: boolean): EndpointConfig {
+		return {
+			...endpoint,
+			headers: includeHeaders ? { ...(endpoint.headers || {}) } : {}
+		};
+	}
+
+	private exportEndpoints(includeHeaders: boolean): void {
 		const payload = {
 			version: 1,
 			exportedAt: new Date().toISOString(),
-			endpoints: this.plugin.settings.endpoints
+			includesHeaders: includeHeaders,
+			endpoints: this.plugin.settings.endpoints.map(endpoint => this.endpointForExport(endpoint, includeHeaders))
 		};
 		const json = JSON.stringify(payload, null, 2);
 		const blob = new Blob([json], { type: 'application/json' });
@@ -945,7 +990,8 @@ class DataFetcherSettingTab extends PluginSettingTab {
 		anchor.click();
 		document.body.removeChild(anchor);
 		URL.revokeObjectURL(url);
-		new Notice(`Exported ${this.plugin.settings.endpoints.length} endpoint(s)`);
+		const headerMode = includeHeaders ? 'with headers' : 'without headers';
+		new Notice(`Exported ${this.plugin.settings.endpoints.length} endpoint(s) ${headerMode}`);
 	}
 
 	private readFileAsText(file: File): Promise<string> {
@@ -1160,6 +1206,51 @@ class EndpointImportModeModal extends Modal {
 		});
 		actions.createEl('button', { text: 'Replace', cls: 'mod-warning' }).addEventListener('click', async () => {
 			await this.onSubmit('replace');
+			this.close();
+		});
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
+class EndpointExportModal extends Modal {
+	private endpoints: EndpointConfig[];
+	private onSubmit: (includeHeaders: boolean) => void;
+	private includeHeaders = false;
+
+	constructor(app: App, endpoints: EndpointConfig[], onSubmit: (includeHeaders: boolean) => void) {
+		super(app);
+		this.endpoints = endpoints;
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		new Setting(contentEl)
+			.setName('Export endpoints')
+			.setHeading();
+
+		contentEl.createEl('p', {
+			text: `Export ${this.endpoints.length} endpoint(s) to JSON. Headers may contain API keys or tokens.`
+		});
+
+		new Setting(contentEl)
+			.setName('Include headers')
+			.setDesc('Disabled by default to avoid exporting secrets such as Authorization headers.')
+			.addToggle(toggle => toggle
+				.setValue(this.includeHeaders)
+				.onChange(value => {
+					this.includeHeaders = value;
+				}));
+
+		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
+		actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
+		actions.createEl('button', { text: 'Export', cls: 'mod-cta' }).addEventListener('click', () => {
+			this.onSubmit(this.includeHeaders);
 			this.close();
 		});
 	}
