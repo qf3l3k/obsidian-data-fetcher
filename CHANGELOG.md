@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.5] - 2026-05-02
+
+### Added
+- Added endpoint list filtering in settings by alias, type, or URL.
+- Added an export confirmation dialog with an explicit `Include headers` option for endpoint JSON exports.
+
+### Changed
+- Endpoint exports now omit headers by default to avoid accidentally sharing API keys or tokens.
+- Frontmatter output is no longer applied from cached render results; it still writes after fresh fetches and manual refreshes.
+
 ## [1.1.4] - 2026-03-21
 
 ### Added

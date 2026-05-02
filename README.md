@@ -18,6 +18,7 @@ Supported endpoint types:
 - Endpoint alias configuration in plugin settings
 - Compact endpoint list with modal editor (v1.1.1)
 - Endpoint import/export for moving aliases between devices (v1.1.2)
+- Endpoint filtering in settings and safer header-free exports by default (v1.1.5)
 - Cache with configurable expiration
 - Cache browser modal (list, preview, delete individual entries)
 - Optional ribbon icon shortcut for cache browser
@@ -184,6 +185,7 @@ Available options:
 - Cache duration (minutes)
 - Endpoint aliases (compact list with Name/Type/URL + actions)
 - Endpoint import/export (JSON)
+- Endpoint filter by alias, type, or URL
 - Per-alias headers
 - Cache clearing
 - Cache browser shortcut
@@ -212,6 +214,7 @@ Available options:
 
 Use command `Open cache browser` (or settings button) to:
 - list cache entries with size/date
+- filter entries by alias, key, type, or URL
 - preview cached payloads
 - delete individual entries
 - clear all cache
