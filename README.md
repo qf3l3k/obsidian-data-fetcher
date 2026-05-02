@@ -1,62 +1,95 @@
 # Data Fetcher
 
-Data Fetcher is an [Obsidian](https://obsidian.md) plugin that runs requests against external data endpoints and renders the result directly in notes.
+Data Fetcher is an [Obsidian](https://obsidian.md) plugin that fetches data from external endpoints and renders it directly inside notes.
 
 <a href="https://buymeacoffee.com/qf3l3k">
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" width="180">
 </a>
 
-Supported endpoint types:
-- REST APIs
-- GraphQL endpoints
-- RPC endpoints
-- gRPC-style endpoints via HTTP proxy
+Use it to query REST APIs, GraphQL endpoints, JSON-RPC APIs, or gRPC-style HTTP proxy endpoints from `data-query` code blocks. Results can be rendered as JSON, tables, Markdown templates, copied to clipboard, saved into the note, cached, or written into note frontmatter.
 
-## Highlights
+## Features
 
-- `data-query` code block processor for live request execution
-- Endpoint alias configuration in plugin settings
-- Compact endpoint list with modal editor (v1.1.1)
-- Endpoint import/export for moving aliases between devices (v1.1.2)
-- Endpoint filtering in settings and safer header-free exports by default (v1.1.5)
-- Markdown template output for turning API responses into note-ready text (v1.2.0)
-- Endpoint testing from the editor before saving changes (v1.2.0)
-- Cache with configurable expiration
-- Cache browser modal (list, preview, delete individual entries)
-- Optional ribbon icon shortcut for cache browser
-- Per-block refresh button
-- Command to refresh all queries in current note
-- Copy result and Save to Note actions
-- Custom headers for authenticated requests
+- Query REST, GraphQL, RPC, and gRPC-style HTTP proxy endpoints.
+- Use direct JSON requests or reusable endpoint aliases from plugin settings.
+- Configure custom headers for authenticated APIs.
+- Test endpoint configuration before saving it.
+- Shape output with dot-path selection.
+- Render output as JSON, table, or Markdown template.
+- Write selected values into note frontmatter/properties.
+- Cache responses with configurable expiration.
+- Browse, preview, filter, delete, or clear cached responses.
+- Refresh one rendered block or all `data-query` blocks in the active note.
+- Copy rendered output or save it as static Markdown in the current note.
+- Import/export endpoint aliases between devices, with headers excluded by default.
 
 ## Installation
 
 ### Community Plugins
 
-1. Open `Settings -> Community Plugins`.
+1. Open `Settings -> Community Plugins` in Obsidian.
 2. Search for `Data Fetcher`.
-3. Install and enable.
+3. Install and enable the plugin.
 
-### Manual
+### Manual Install
 
-1. Download release assets from [GitHub releases](https://github.com/qf3l3k/obsidian-data-fetcher/releases).
-2. Copy `manifest.json`, `main.js`, and `styles.css` into:
-   `.obsidian/plugins/data-fetcher`
-3. Reload Obsidian and enable the plugin.
+1. Download `manifest.json`, `main.js`, and `styles.css` from the latest [GitHub release](https://github.com/qf3l3k/obsidian-data-fetcher/releases).
+2. Copy those files into `.obsidian/plugins/data-fetcher` in your vault.
+3. Reload Obsidian and enable `Data Fetcher`.
 
-## How It Works
+## Quick Start
 
-Create a code block with language `data-query`.
-The plugin parses the block, executes the query, caches the response, and renders output below the block.
-
-## Query Syntax
-
-### Direct JSON Query (all endpoint types)
+Create a fenced code block with language `data-query`:
 
 ```data-query
 {
   "type": "rest",
-  "url": "https://api.example.com/data",
+  "url": "https://api.github.com/users/octocat/repos",
+  "method": "GET",
+  "path": "0",
+  "template": "First repo: [{{name}}]({{html_url}})"
+}
+```
+
+When the note is rendered, Data Fetcher executes the request, caches the response, and renders the selected output below the block.
+
+## Endpoint Aliases
+
+For repeated use, configure endpoints in `Settings -> Data Fetcher` and reference them by alias.
+
+Example endpoint:
+
+- Alias: `github-repos`
+- Type: `REST`
+- URL: `https://api.github.com/users/octocat/repos`
+- Method: `GET`
+
+Then use it in a note:
+
+```data-query
+@github-repos
+path: 0
+template: First repo: [{{name}}]({{html_url}})
+```
+
+Endpoint settings support:
+
+- Alias, type, URL, method, and headers.
+- Compact endpoint list with filtering by alias, type, or URL.
+- Edit, duplicate, and delete actions.
+- Endpoint test button in the add/edit dialog.
+- Import/export for moving endpoint lists between devices.
+
+Header exports are disabled by default so API keys and tokens are not accidentally shared.
+
+## Query Types
+
+### REST
+
+```data-query
+{
+  "type": "rest",
+  "url": "https://api.example.com/items",
   "method": "GET",
   "headers": {
     "Authorization": "Bearer your-token"
@@ -64,234 +97,220 @@ The plugin parses the block, executes the query, caches the response, and render
 }
 ```
 
-### Alias Query
-
-Configure alias in plugin settings, then reference it:
-
-```data-query
-@my-api-alias
-body: {"id": 123}
-```
-
-### Alias With Inline Variables (Issue #5, v1.0.7)
-
-```data-query
-@github-api({"first": 5, "after": null})
-query: query($first: Int, $after: String) { viewer { repositories(first: $first, after: $after) { nodes { name } } } }
-```
-
-Equivalent variant:
-
-```data-query
-=@github-api({"first": 5})
-query: query($first: Int) { viewer { repositories(first: $first) { nodes { name } } } }
-```
-
-Notes:
-- Inline variables must be a valid JSON object.
-- Explicit `variables:` entry later in the block overrides inline variables.
-
-### Output Shaping (Issue #6, v1.0.8)
-
-You can control rendered output with:
-- `path`: selects nested data using dot notation
-- `format`: `json` (default) or `table`
-
-Example:
-
-```data-query
-@bitsong
-query: query MyQuery { nftTokens { edges { node { id minter } } } }
-path: nftTokens.edges
-format: table
-```
-
-Notes:
-- `table` works on arrays of objects.
-- If `format: table` is used on unsupported data, plugin falls back to JSON output.
-- Paths can include array indexes, for example `data.items.0`.
-
-### Template Output (v1.2.0)
-
-Use `template:` to convert selected API data into Markdown. Templates are applied after `path` selection.
-
-```data-query
-@github-api
-path: items
-template: - [{{name}}]({{html_url}}) by {{owner.login}}
-```
-
-For array data, the template is rendered once per item and joined with new lines. For object data, the template is rendered once.
-
-Direct JSON queries can also provide a template:
-
-```data-query
-{
-  "type": "rest",
-  "url": "https://api.github.com/users/octocat/repos",
-  "path": "0",
-  "template": "First repo: [{{name}}]({{html_url}})"
-}
-```
-
-Notes:
-- Placeholders use `{{field}}` or nested dot paths like `{{owner.login}}`.
-- Missing placeholder values render as empty strings.
-- For primitive values, use `{{value}}`.
-- When `template` is set, it takes precedence over `format: table`.
-- `output: frontmatter` still writes raw selected data, not rendered template text.
-
-### Frontmatter Output (Issue #2, v1.0.9)
-
-You can write fetched output into note properties/frontmatter:
-
-```data-query
-@bitsong
-query: query MyQuery { nftTokens { edges { node { id minter } } } }
-path: nftTokens.edges.0.node.id
-output: frontmatter
-property: external.firstTokenId
-```
-
-Notes:
-- `output: frontmatter` writes selected data to the current note frontmatter.
-- `property` is required and supports dot-path notation (for nested properties).
-- This mode updates current note metadata; it does not create new notes.
-
-## Endpoint Type Reference
-
-### REST
-
-Common fields:
-- `type`: `rest`
-- `url`: endpoint URL
-- `method`: `GET` | `POST` | `PUT` | `DELETE`
-- `headers`: object
-- `body`: object or string
+REST supports `GET`, `POST`, `PUT`, and `DELETE`. Use `body` for request payloads.
 
 ### GraphQL
-
-Common fields:
-- `type`: `graphql`
-- `url`: GraphQL endpoint URL
-- `query`: GraphQL query string
-- `variables`: JSON object
-- `path`: optional dot-path selector for rendered data
-- `format`: `json` | `table` for rendered output
-- `headers`: object
-
-Example:
 
 ```data-query
 {
   "type": "graphql",
-  "url": "https://indexer-bs721-base.bitsong.io/",
-  "query": "query MyQuery { nftTokens { edges { node { id minter } } } }",
-  "variables": {}
+  "url": "https://api.example.com/graphql",
+  "query": "query($first: Int) { viewer { repositories(first: $first) { nodes { name url } } } }",
+  "variables": {
+    "first": 5
+  },
+  "path": "data.viewer.repositories.nodes",
+  "format": "table"
 }
 ```
 
-### RPC
+With an alias, inline variables can be passed at the call site:
 
-Common fields:
-- `type`: `rpc`
-- `url`: RPC endpoint URL
-- `method`: always `POST`
-- `query`: method name
-- `body`: params object
-- `headers`: object
+```data-query
+@github-api({"first": 5})
+query: query($first: Int) { viewer { repositories(first: $first) { nodes { name url } } } }
+path: viewer.repositories.nodes
+format: table
+```
 
-### gRPC via proxy
+`=@alias({...})` is also supported for inline-style calls.
 
-Common fields:
-- `type`: `grpc`
-- `url`: proxy endpoint URL
-- `body`: payload object
-- `headers`: object
+### RPC / JSON-RPC
 
-## Settings
+```data-query
+{
+  "type": "rpc",
+  "url": "https://rpc.example.com",
+  "query": "status",
+  "body": {}
+}
+```
 
-Open `Settings -> Data Fetcher`.
+RPC requests are sent as JSON-RPC-style `POST` requests. `query` is used as the RPC method name and `body` is used as params.
 
-Available options:
-- Cache duration (minutes)
-- Endpoint aliases (compact list with Name/Type/URL + actions)
-- Endpoint testing from add/edit dialog
-- Endpoint import/export (JSON)
-- Endpoint filter by alias, type, or URL
-- Per-alias headers
-- Cache clearing
-- Cache browser shortcut
-- Cache browser ribbon icon toggle
-- Cache info preview (item count/size)
+### gRPC via HTTP Proxy
+
+```data-query
+{
+  "type": "grpc",
+  "url": "https://proxy.example.com/my.Service/GetItem",
+  "body": {
+    "id": "123"
+  }
+}
+```
+
+Obsidian does not provide native gRPC transport. This mode is intended for gRPC services exposed through an HTTP/JSON proxy.
+
+## Output Options
+
+### Select Data With `path`
+
+Use dot notation to select nested response data:
+
+```data-query
+@github-repos
+path: 0.owner.login
+```
+
+Paths can include array indexes, for example `items.0.name`.
+
+### Render as JSON
+
+JSON is the default output format:
+
+```data-query
+@github-repos
+path: 0
+format: json
+```
+
+### Render as a Table
+
+Tables work best with arrays of objects:
+
+```data-query
+@github-repos
+path: data
+format: table
+```
+
+If table rendering cannot find an array of objects, the plugin falls back to JSON output.
+
+### Render With a Markdown Template
+
+Templates turn API data into note-ready Markdown:
+
+```data-query
+@github-repos
+path: data
+template: - [{{name}}]({{html_url}}) by {{owner.login}}
+```
+
+Template rules:
+
+- `{{field}}` inserts a field from the selected object.
+- `{{owner.login}}` supports nested fields.
+- Missing values render as empty strings.
+- Arrays render one template result per item, joined with new lines.
+- Primitive values can be referenced with `{{value}}`.
+- `template` takes precedence over `format: table`.
+
+### Write to Frontmatter
+
+Use `output: frontmatter` to write selected data into note properties:
+
+```data-query
+@github-repos
+path: 0.name
+output: frontmatter
+property: external.firstRepo
+```
+
+Notes:
+
+- `property` is required.
+- Dot-path properties are supported, for example `external.github.firstRepo`.
+- Frontmatter writes use raw selected data, not rendered template text.
+- Cached render results do not write frontmatter; fresh fetches and manual refreshes do.
+
+## Rendered Block Actions
+
+Each rendered result includes:
+
+- `Refresh`: reruns the query and updates the cache.
+- `Copy`: copies the rendered output.
+- `Save to Note`: inserts/replaces static Markdown output in the current note.
 
 ## Commands
 
-- `Refresh data query`: refreshes all `data-query` blocks in the active note and updates cache.
-- `Open cache browser`: opens cache browser modal for cache inspection and management.
+Data Fetcher adds these commands:
 
-## Actions in Rendered Block
+- `Refresh data query`: refresh all `data-query` blocks in the active note.
+- `Open cache browser`: inspect and manage cached responses.
 
-- `Refresh`: reruns that query and updates cached value.
-- `Copy`: copies rendered response to clipboard.
-- `Save to Note`: replaces/inserts static result in current markdown file.
+## Cache Management
 
-## Caching Behavior
+Data Fetcher stores cached responses in `.data-fetcher-cache` in the vault root.
 
-- Cache location: `.data-fetcher-cache` in vault root.
-- Keying: deterministic hash of query parameters.
-- Expiration: controlled by `Cache duration` setting.
-- Manual refresh bypasses stale content by re-executing query and writing fresh cache.
+In settings, you can:
 
-### Cache Browser
+- Set cache duration in minutes.
+- Clear all cached responses.
+- Open the cache browser.
+- Enable an optional ribbon icon for quick cache browser access.
 
-Use command `Open cache browser` (or settings button) to:
-- list cache entries with size/date
-- filter entries by alias, key, type, or URL
-- preview cached payloads
-- delete individual entries
-- clear all cache
+The cache browser can:
+
+- List cached entries with alias-aware labels, size, date, type, and URL.
+- Filter entries by alias, hash, type, or URL.
+- Preview cached payloads.
+- Delete individual entries.
+- Clear all entries.
+
+## Import and Export
+
+Endpoint configurations can be exported to JSON and imported on another device.
+
+Export behavior:
+
+- Headers are excluded by default.
+- Enable `Include headers` only when you intentionally want to export secrets such as Authorization tokens.
+
+Import behavior:
+
+- `Merge` updates matching aliases and adds new ones.
+- `Replace` overwrites the current endpoint list.
+- Invalid or duplicate entries are skipped with a summary.
 
 ## Troubleshooting
 
-- `Endpoint alias "..." not found`: add or fix alias in settings.
-- `Variables must be valid JSON`: ensure valid JSON syntax (`{"x": 1}` not `{x: 1}`).
-- `Path "..." not found`: check nested field names/indexes in response data.
-- `Table format requires an array of objects`: update `path` to point at an object array, or use `format: json`.
-- `property is required when output: frontmatter is used`: add a property path.
-- Template placeholders are blank: check field names against the selected data after `path` is applied.
-- GraphQL endpoint test fails with missing query: test the complete query from a `data-query` block, or add a query when executing in a note.
+- `Endpoint alias "..." not found`: add the alias in settings or fix the alias name in the note.
+- `Variables must be valid JSON`: use valid JSON, for example `{"first": 5}`.
+- `Path "..." not found`: verify the response shape and the selected path.
+- `Table format requires an array of objects`: point `path` at an array of objects or use JSON/template output.
+- Blank template placeholders: check field names against the data selected by `path`.
+- `property is required when output: frontmatter is used`: add a `property` value.
+- GraphQL endpoint test fails with missing query: endpoint testing checks the saved endpoint draft; run complete GraphQL queries from a note block.
 - `Response too large for this device`: reduce payload size, add filters/limits, or use a proxy endpoint.
-- No result refresh from command: ensure active pane is a markdown file.
-- Build fails on PowerShell script policy: run via `cmd /c npm run build`.
+- No command refresh happens: make sure the active pane is a Markdown note.
+
+## Privacy and Data Disclosure
+
+This plugin communicates with external services and stores response data locally.
+
+- Network usage: sends HTTP(S) requests to endpoints configured in notes or settings.
+- External dependency: uses Obsidian's built-in `requestUrl` API.
+- Data sent: URL, method, headers, body, query, and variables you configure.
+- Data stored locally: plugin settings and cached responses in `.data-fetcher-cache`.
+- Data shared externally: only with endpoints you configure.
 
 ## Development
 
 Build:
 
-```powershell
-cmd /c npm install
-cmd /c npm run build
+```bash
+npm install
+npm run build
 ```
 
 Watch mode:
 
-```powershell
-cmd /c npm run dev
+```bash
+npm run dev
 ```
 
-Test in vault by linking/copying plugin files to:
-`.obsidian/plugins/data-fetcher`
-
-## Data Disclosure
-
-This plugin communicates with external services and stores response data:
-
-- Network usage: Sends HTTP(S) requests to endpoints configured in notes/settings.
-- External dependencies: Uses Obsidian built-in `requestUrl` API.
-- Data sent: URL, method, headers, and optional body/query/variables you configure.
-- Data stored locally: plugin settings and cached responses in `.data-fetcher-cache`.
-- Data shared externally: only with endpoints you configure.
+Test in a vault by linking or copying plugin files to `.obsidian/plugins/data-fetcher`.
 
 ## Support
 
