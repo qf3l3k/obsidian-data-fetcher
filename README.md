@@ -19,6 +19,8 @@ Supported endpoint types:
 - Compact endpoint list with modal editor (v1.1.1)
 - Endpoint import/export for moving aliases between devices (v1.1.2)
 - Endpoint filtering in settings and safer header-free exports by default (v1.1.5)
+- Markdown template output for turning API responses into note-ready text (v1.2.0)
+- Endpoint testing from the editor before saving changes (v1.2.0)
 - Cache with configurable expiration
 - Cache browser modal (list, preview, delete individual entries)
 - Optional ribbon icon shortcut for cache browser
@@ -109,7 +111,37 @@ Notes:
 - If `format: table` is used on unsupported data, plugin falls back to JSON output.
 - Paths can include array indexes, for example `data.items.0`.
 
-### Frontmatter Output (Issue #2, in progress for v1.0.9)
+### Template Output (v1.2.0)
+
+Use `template:` to convert selected API data into Markdown. Templates are applied after `path` selection.
+
+```data-query
+@github-api
+path: items
+template: - [{{name}}]({{html_url}}) by {{owner.login}}
+```
+
+For array data, the template is rendered once per item and joined with new lines. For object data, the template is rendered once.
+
+Direct JSON queries can also provide a template:
+
+```data-query
+{
+  "type": "rest",
+  "url": "https://api.github.com/users/octocat/repos",
+  "path": "0",
+  "template": "First repo: [{{name}}]({{html_url}})"
+}
+```
+
+Notes:
+- Placeholders use `{{field}}` or nested dot paths like `{{owner.login}}`.
+- Missing placeholder values render as empty strings.
+- For primitive values, use `{{value}}`.
+- When `template` is set, it takes precedence over `format: table`.
+- `output: frontmatter` still writes raw selected data, not rendered template text.
+
+### Frontmatter Output (Issue #2, v1.0.9)
 
 You can write fetched output into note properties/frontmatter:
 
@@ -184,6 +216,7 @@ Open `Settings -> Data Fetcher`.
 Available options:
 - Cache duration (minutes)
 - Endpoint aliases (compact list with Name/Type/URL + actions)
+- Endpoint testing from add/edit dialog
 - Endpoint import/export (JSON)
 - Endpoint filter by alias, type, or URL
 - Per-alias headers
@@ -226,6 +259,8 @@ Use command `Open cache browser` (or settings button) to:
 - `Path "..." not found`: check nested field names/indexes in response data.
 - `Table format requires an array of objects`: update `path` to point at an object array, or use `format: json`.
 - `property is required when output: frontmatter is used`: add a property path.
+- Template placeholders are blank: check field names against the selected data after `path` is applied.
+- GraphQL endpoint test fails with missing query: test the complete query from a `data-query` block, or add a query when executing in a note.
 - `Response too large for this device`: reduce payload size, add filters/limits, or use a proxy endpoint.
 - No result refresh from command: ensure active pane is a markdown file.
 - Build fails on PowerShell script policy: run via `cmd /c npm run build`.
