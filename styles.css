@@ -147,6 +147,11 @@
     font-size: var(--font-ui-smaller);
 }
 
+.data-fetcher-endpoint-filter {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
 .data-fetcher-endpoint-row {
     display: grid;
     grid-template-columns: minmax(84px, 1fr) 72px minmax(140px, 2fr) 64px minmax(150px, 1.2fr);
