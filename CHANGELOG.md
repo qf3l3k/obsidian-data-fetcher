@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-05-02
+
+### Added
+- Added Markdown template output with `template:` for alias and direct JSON queries.
+- Template placeholders support nested dot paths, for example `{{owner.login}}`.
+- Array responses render one template result per item, joined by new lines.
+- Added `Test endpoint` action in the endpoint editor to verify an unsaved endpoint draft without writing cache or frontmatter.
+
+### Changed
+- Template output now drives rendered output, Copy, and Save to Note actions when provided.
+- Template output takes precedence over `format: table`; frontmatter output still writes raw selected data.
+
 ## [1.1.5] - 2026-05-02
 
 ### Added

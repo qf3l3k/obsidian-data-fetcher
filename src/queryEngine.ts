@@ -7,6 +7,7 @@ export interface QueryParams {
     output?: 'render' | 'frontmatter';
     property?: string;
     format?: 'json' | 'table';
+    template?: string;
     path?: string;
     url?: string;
     method?: string;
@@ -80,6 +81,32 @@ function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVari
     }
 }
 
+function isKnownParameterLine(line: string): boolean {
+    return /^(body|query|variables|path|format|output|property|template)\s*:/i.test(line.trim());
+}
+
+function collectMultilineValue(lines: string[], startIndex: number, initialValue: string): { value: string; endIndex: number } {
+    let value = initialValue;
+    let endIndex = startIndex;
+
+    for (let j = startIndex + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        const trimmedNextLine = nextLine.trim();
+
+        if (trimmedNextLine && isKnownParameterLine(trimmedNextLine)) {
+            break;
+        }
+
+        value += '\n' + nextLine;
+        endIndex = j;
+    }
+
+    return {
+        value: value.trim(),
+        endIndex
+    };
+}
+
 /**
  * Parse the data query from the codeblock
  */
@@ -122,44 +149,39 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                 // Check if it's a parameter assignment
                 if (line.includes(':')) {
                     const [key, ...valueParts] = line.split(':');
+                    const normalizedKey = key.trim().toLowerCase();
                     let value = valueParts.join(':').trim();
                     
-                    // Handle multi-line values (especially for GraphQL queries)
-                    if (key.trim() === 'query' && i + 1 < lines.length) {
-                        // Collect all lines until we hit a line that looks like a new parameter
-                        for (let j = i + 1; j < lines.length; j++) {
-                            const nextLine = lines[j].trim();
-                            if (nextLine && !nextLine.includes(':')) {
-                                value += '\n' + nextLine;
-                                i = j; // Update the outer loop counter
-                            } else if (nextLine.includes(':')) {
-                                break; // Stop when we hit a new parameter
-                            }
-                        }
+                    if ((normalizedKey === 'query' || normalizedKey === 'template') && i + 1 < lines.length) {
+                        const collected = collectMultilineValue(lines, i, value);
+                        value = collected.value;
+                        i = collected.endIndex;
                     }
                     
-                    if (key.trim() === 'body') {
+                    if (normalizedKey === 'body') {
                         try {
                             queryParams.body = JSON.parse(value);
                         } catch {
                             queryParams.body = value;
                         }
-                    } else if (key.trim() === 'query') {
+                    } else if (normalizedKey === 'query') {
                         queryParams.query = value;
-                    } else if (key.trim() === 'variables') {
+                    } else if (normalizedKey === 'variables') {
                         try {
                             queryParams.variables = JSON.parse(value);
                         } catch {
                             throw new Error('Variables must be valid JSON');
                         }
-                    } else if (key.trim() === 'path') {
+                    } else if (normalizedKey === 'path') {
                         queryParams.path = value;
-                    } else if (key.trim() === 'format') {
+                    } else if (normalizedKey === 'format') {
                         queryParams.format = parseOutputFormat(value);
-                    } else if (key.trim() === 'output') {
+                    } else if (normalizedKey === 'output') {
                         queryParams.output = parseOutputTarget(value);
-                    } else if (key.trim() === 'property') {
+                    } else if (normalizedKey === 'property') {
                         queryParams.property = value;
+                    } else if (normalizedKey === 'template') {
+                        queryParams.template = value;
                     }
                 }
             }

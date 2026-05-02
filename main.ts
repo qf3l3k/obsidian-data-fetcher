@@ -1,4 +1,4 @@
-import { App, Editor, EventRef, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, Editor, EventRef, MarkdownRenderer, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { DataFetcherSettings, DEFAULT_SETTINGS, EndpointConfig } from './src/settings';
 import { parseDataQuery, executeQuery, QueryParams, QueryResult } from './src/queryEngine';
 import { CacheManager } from './src/cacheManager';
@@ -444,6 +444,68 @@ export default class DataFetcherPlugin extends Plugin {
 		return [headerLine, dividerLine, ...rowLines].join('\n');
 	}
 
+	private resolveTemplatePath(data: any, path: string): any {
+		const normalizedPath = path.trim();
+		if (!normalizedPath) {
+			return '';
+		}
+
+		if (normalizedPath === 'value' && (data === null || typeof data !== 'object')) {
+			return data;
+		}
+
+		const segments = normalizedPath.split('.').map(segment => segment.trim()).filter(Boolean);
+		let current = data;
+
+		for (const segment of segments) {
+			if (current === null || current === undefined) {
+				return '';
+			}
+
+			if (Array.isArray(current)) {
+				const index = Number(segment);
+				if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+					return '';
+				}
+				current = current[index];
+				continue;
+			}
+
+			if (typeof current === 'object' && segment in current) {
+				current = current[segment];
+				continue;
+			}
+
+			return '';
+		}
+
+		return current;
+	}
+
+	private templateValueToString(value: any): string {
+		if (value === null || value === undefined) {
+			return '';
+		}
+		if (typeof value === 'object') {
+			return JSON.stringify(value);
+		}
+		return String(value);
+	}
+
+	private renderTemplate(template: string, data: any): string {
+		return template.replace(/{{\s*([^}]+?)\s*}}/g, (_match, path) => {
+			return this.templateValueToString(this.resolveTemplatePath(data, String(path)));
+		});
+	}
+
+	private renderTemplateOutput(template: string, data: any): string {
+		if (Array.isArray(data)) {
+			return data.map(item => this.renderTemplate(template, item)).join('\n');
+		}
+
+		return this.renderTemplate(template, data);
+	}
+
 	renderResult(result: QueryResult, container: HTMLElement, query?: QueryParams, ctx?: any) {
 	    // First clear the container
 	    container.empty();
@@ -550,6 +612,9 @@ export default class DataFetcherPlugin extends Plugin {
 	        if (selectedData === null || selectedData === undefined) {
 	            outputText = 'No data returned';
 	            content.setText(outputText);
+	        } else if (query?.template?.trim()) {
+	            outputText = this.renderTemplateOutput(query.template, selectedData);
+	            void MarkdownRenderer.render(this.app, outputText, content, ctx?.sourcePath || '', this);
 	        } else if (format === 'table') {
 	            const tableInput = this.tryResolveTableInput(selectedData);
 	            const resolvedTableInput = this.buildTableData(tableInput)
@@ -1260,6 +1325,59 @@ class EndpointExportModal extends Modal {
 	}
 }
 
+class EndpointTestResultModal extends Modal {
+	private query: QueryParams;
+	private result: QueryResult;
+	private durationMs: number;
+
+	constructor(app: App, query: QueryParams, result: QueryResult, durationMs: number) {
+		super(app);
+		this.query = query;
+		this.result = result;
+		this.durationMs = durationMs;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		this.modalEl.addClass('data-fetcher-endpoint-test-modal');
+
+		new Setting(contentEl)
+			.setName('Endpoint test result')
+			.setHeading();
+
+		const statusText = this.result.error ? 'Failed' : 'Success';
+		contentEl.createEl('div', {
+			text: statusText,
+			cls: this.result.error ? 'data-fetcher-endpoint-test-status-error' : 'data-fetcher-endpoint-test-status-success'
+		});
+
+		const meta = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-test-meta' });
+		meta.createEl('div', { text: `Type: ${this.query.type}` });
+		meta.createEl('div', { text: `URL: ${this.query.url || ''}` });
+		meta.createEl('div', { text: `Duration: ${Math.round(this.durationMs)} ms` });
+
+		if (this.result.error) {
+			contentEl.createEl('div', { text: this.result.error, cls: 'data-fetcher-error' });
+		}
+
+		const previewValue = this.result.error ? this.result.data : this.result.data;
+		const previewText = typeof previewValue === 'string'
+			? previewValue
+			: JSON.stringify(previewValue, null, 2);
+		const pre = contentEl.createEl('pre', { cls: 'data-fetcher-endpoint-test-preview' });
+		pre.createEl('code', { text: previewText || '(empty response)' });
+
+		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
+		actions.createEl('button', { text: 'Close', cls: 'mod-cta' }).addEventListener('click', () => this.close());
+	}
+
+	onClose() {
+		this.modalEl.removeClass('data-fetcher-endpoint-test-modal');
+		this.contentEl.empty();
+	}
+}
+
 class EndpointEditorModal extends Modal {
 	private endpoint: EndpointConfig;
 	private existingAliases: Set<string>;
@@ -1323,6 +1441,52 @@ class EndpointEditorModal extends Modal {
 				.onChange(value => {
 					this.endpoint.method = value;
 				}));
+	}
+
+	private buildTestQuery(): QueryParams {
+		const url = this.endpoint.url?.trim();
+		if (!url) {
+			throw new Error('URL is required before testing.');
+		}
+
+		const alias = this.endpoint.alias?.trim() || 'endpoint-test';
+		const method = this.endpoint.type === 'rest'
+			? (this.endpoint.method || 'GET')
+			: 'POST';
+
+		return {
+			endpoint: alias,
+			type: this.endpoint.type,
+			url,
+			method,
+			headers: { ...(this.endpoint.headers || {}) },
+			body: this.endpoint.body,
+			query: this.endpoint.query
+		};
+	}
+
+	private async testEndpoint(button: HTMLButtonElement): Promise<void> {
+		let query: QueryParams;
+		try {
+			query = this.buildTestQuery();
+		} catch (error) {
+			new Notice(error.message);
+			return;
+		}
+
+		button.disabled = true;
+		const originalText = button.textContent || 'Test endpoint';
+		button.setText('Testing...');
+		const startedAt = performance.now();
+
+		try {
+			const result = await executeQuery(query);
+			const durationMs = performance.now() - startedAt;
+			new EndpointTestResultModal(this.app, query, result, durationMs).open();
+		} finally {
+			button.disabled = false;
+			button.setText(originalText);
+		}
 	}
 
 	onOpen() {
@@ -1391,6 +1555,9 @@ class EndpointEditorModal extends Modal {
 
 		const actions = contentEl.createEl('div', { cls: 'data-fetcher-endpoint-editor-actions' });
 		actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
+		actions.createEl('button', { text: 'Test endpoint' }).addEventListener('click', async (event) => {
+			await this.testEndpoint(event.currentTarget as HTMLButtonElement);
+		});
 		actions.createEl('button', { text: 'Save', cls: 'mod-cta' }).addEventListener('click', () => {
 			const normalizedAlias = this.endpoint.alias?.trim();
 			if (!normalizedAlias) {
