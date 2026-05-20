@@ -23,6 +23,32 @@ export interface QueryResult {
     error?: string;
 }
 
+function findHeaderValue(headers: Record<string, string>, targetName: string): string | undefined {
+    const normalizedTarget = targetName.toLowerCase();
+
+    for (const [name, value] of Object.entries(headers || {})) {
+        if (name.toLowerCase() === normalizedTarget) {
+            return value;
+        }
+    }
+
+    return undefined;
+}
+
+function tryParseJsonText(text: string): any | undefined {
+    const trimmed = text.trim();
+
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+        return undefined;
+    }
+
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return undefined;
+    }
+}
+
 function formatRequestError(error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
     const normalized = message.toLowerCase();
@@ -291,14 +317,17 @@ async function executeRestQuery(params: QueryParams): Promise<any> {
     
     const response = await requestUrl(requestParams);
     
-    // Parse response based on content type
-    const contentType = response.headers['content-type'];
-    
-    if (contentType && contentType.includes('application/json')) {
+    // Mobile builds may expose response headers with different casing, so
+    // treat Content-Type lookup as case-insensitive and fall back to parsing
+    // the body when JSON-looking payloads arrive without a usable header.
+    const contentType = findHeaderValue(response.headers || {}, 'content-type');
+
+    if (contentType && contentType.toLowerCase().includes('application/json')) {
         return response.json;
-    } else {
-        return response.text;
     }
+
+    const parsedText = tryParseJsonText(response.text);
+    return parsedText !== undefined ? parsedText : response.text;
 }
 
 /**

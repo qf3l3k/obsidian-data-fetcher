@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Improved REST response parsing for mobile platforms by handling `Content-Type` headers case-insensitively and falling back to JSON body parsing when the payload is JSON-like. This fixes `path` lookups such as `path: 0` failing on Android and iPad for endpoints that return JSON arrays.
+
 ## [1.2.0] - 2026-05-02
 
 ### Added
