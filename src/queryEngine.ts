@@ -12,10 +12,14 @@ export interface QueryParams {
     url?: string;
     method?: string;
     headers?: Record<string, string>;
+    params?: Record<string, QueryParamInput>;
     body?: any;
     query?: string;
     variables?: Record<string, any>;
 }
+
+type QueryParamPrimitive = string | number | boolean;
+type QueryParamInput = QueryParamPrimitive | QueryParamPrimitive[];
 
 export interface QueryResult {
     data: any;
@@ -76,6 +80,46 @@ function parseOutputTarget(value: string): 'render' | 'frontmatter' {
     throw new Error(`Unsupported output "${value}". Use "render" or "frontmatter"`);
 }
 
+function normalizeQueryParams(value: unknown): Record<string, QueryParamInput> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('Params must be a JSON object');
+    }
+
+    const normalized: Record<string, QueryParamInput> = {};
+
+    for (const [key, paramValue] of Object.entries(value as Record<string, unknown>)) {
+        if (!key.trim()) {
+            continue;
+        }
+
+        if (Array.isArray(paramValue)) {
+            if (!paramValue.every(item =>
+                typeof item === 'string' ||
+                typeof item === 'number' ||
+                typeof item === 'boolean'
+            )) {
+                throw new Error(`Param "${key}" contains an unsupported array value`);
+            }
+
+            normalized[key] = paramValue as QueryParamPrimitive[];
+            continue;
+        }
+
+        if (
+            typeof paramValue === 'string' ||
+            typeof paramValue === 'number' ||
+            typeof paramValue === 'boolean'
+        ) {
+            normalized[key] = paramValue;
+            continue;
+        }
+
+        throw new Error(`Param "${key}" must be a string, number, boolean, or array of those values`);
+    }
+
+    return normalized;
+}
+
 function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVariables?: Record<string, any> } {
     const normalizedAliasLine = aliasLine.startsWith('=@') ? aliasLine.substring(1).trim() : aliasLine;
     const inlineCallPattern = /^@([A-Za-z0-9._-]+)\s*(?:\(([\s\S]*)\))?\s*$/;
@@ -108,7 +152,7 @@ function parseAliasReferenceLine(aliasLine: string): { alias: string; inlineVari
 }
 
 function isKnownParameterLine(line: string): boolean {
-    return /^(body|query|variables|path|format|output|property|template)\s*:/i.test(line.trim());
+    return /^(body|query|variables|params|path|format|output|property|template)\s*:/i.test(line.trim());
 }
 
 function collectMultilineValue(lines: string[], startIndex: number, initialValue: string): { value: string; endIndex: number } {
@@ -198,6 +242,12 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
                         } catch {
                             throw new Error('Variables must be valid JSON');
                         }
+                    } else if (normalizedKey === 'params') {
+                        try {
+                            queryParams.params = normalizeQueryParams(JSON.parse(value));
+                        } catch (error) {
+                            throw new Error(error instanceof Error ? error.message : 'Params must be valid JSON');
+                        }
                     } else if (normalizedKey === 'path') {
                         queryParams.path = value;
                     } else if (normalizedKey === 'format') {
@@ -233,6 +283,10 @@ export function parseDataQuery(source: string, settings: DataFetcherSettings): Q
 
                 if (queryObj.output !== undefined) {
                     queryObj.output = parseOutputTarget(String(queryObj.output));
+                }
+
+                if (queryObj.params !== undefined) {
+                    queryObj.params = normalizeQueryParams(queryObj.params);
                 }
                 
                 return {
@@ -293,9 +347,26 @@ async function executeRestQuery(params: QueryParams): Promise<any> {
     if (!params.url) {
         throw new Error('URL is required for REST queries');
     }
-    
+
+    const requestUrlValue = new URL(params.url);
+
+    if (params.params) {
+        for (const [key, value] of Object.entries(params.params)) {
+            requestUrlValue.searchParams.delete(key);
+
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    requestUrlValue.searchParams.append(key, String(item));
+                }
+                continue;
+            }
+
+            requestUrlValue.searchParams.set(key, String(value));
+        }
+    }
+
     const requestParams: RequestUrlParam = {
-        url: params.url,
+        url: requestUrlValue.toString(),
         method: params.method || 'GET',
         headers: params.headers || {},
     };

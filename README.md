@@ -91,13 +91,17 @@ Header exports are disabled by default so API keys and tokens are not accidental
   "type": "rest",
   "url": "https://api.example.com/items",
   "method": "GET",
+  "params": {
+    "page": 1,
+    "tag": "obsidian"
+  },
   "headers": {
     "Authorization": "Bearer your-token"
   }
 }
 ```
 
-REST supports `GET`, `POST`, `PUT`, and `DELETE`. Use `body` for request payloads.
+REST supports `GET`, `POST`, `PUT`, and `DELETE`. Use `params` for query-string parameters and `body` for request payloads.
 
 ### GraphQL
 
@@ -124,6 +128,14 @@ format: table
 ```
 
 `=@alias({...})` is also supported for inline-style calls.
+
+REST aliases can use `params:` to build encoded query strings:
+
+```data-query
+@github-repos
+params: {"per_page": 5, "sort": "updated"}
+format: table
+```
 
 ### RPC / JSON-RPC
 
