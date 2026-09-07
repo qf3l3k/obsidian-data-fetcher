@@ -48,6 +48,7 @@ export class CacheManager {
             type: params.type,
             method: params.method,
             headers: params.headers,
+            params: params.params,
             body: params.body,
             query: params.query,
             variables: params.variables
