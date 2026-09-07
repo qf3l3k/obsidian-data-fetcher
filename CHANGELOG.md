@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 2026-09-07
 
 ### Added
 - Issue #17: added explicit `params` support for REST requests in both direct JSON queries and alias blocks. REST query parameters are URL-encoded before execution and included in cache keys.
