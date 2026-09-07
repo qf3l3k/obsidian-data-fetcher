@@ -2,10 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - Unreleased
 
 ### Added
-- Added explicit `params` support for REST requests in both direct JSON queries and alias blocks. REST query parameters are URL-encoded before execution and included in cache keys.
+- Issue #17: added explicit `params` support for REST requests in both direct JSON queries and alias blocks. REST query parameters are URL-encoded before execution and included in cache keys.
+- REST params accept strings, numbers, booleans, and arrays of those values. Arrays produce repeated query parameters, and explicit params override matching keys in the endpoint URL.
 
 ## [1.2.1] - 2026-05-20
 
